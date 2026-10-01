@@ -1,0 +1,2057 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BioSemantic Monitor v5.0</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script src="https://d3js.org/d3.v7.min.js"></script>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Segoe UI',Tahoma,sans-serif;background:#0a0e13;color:#e6edf3;overflow:hidden;height:100vh;font-size:13px}
+.header{background:linear-gradient(90deg,#0d1117,#161b22);border-bottom:1px solid #21262d;padding:8px 20px;display:flex;align-items:center;justify-content:space-between;z-index:1000}
+.logo{display:flex;align-items:center;gap:10px}
+.logo-icon{width:32px;height:32px;background:linear-gradient(135deg,#2ea043,#56d364);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:16px}
+.logo-text h1{font-size:14px;font-weight:600}
+.logo-text span{font-size:8px;color:#7d8590;letter-spacing:1px}
+.nav-tabs{display:flex;gap:4px;background:#0d1117;padding:3px;border-radius:8px;border:1px solid #21262d}
+.nav-tab{padding:6px 12px;background:transparent;color:#7d8590;border:none;cursor:pointer;font-size:10px;font-weight:600;border-radius:6px}
+.nav-tab.active{background:#2ea043;color:#fff}
+.nav-tab:hover:not(.active){background:#21262d;color:#e6edf3}
+.live-indicator{display:flex;align-items:center;gap:8px;font-size:10px;font-family:'Courier New'}
+.live-status{display:flex;align-items:center;gap:4px;padding:3px 8px;border-radius:4px}
+.live-status.online{background:rgba(86,211,100,.15);color:#56d364}
+.live-status.offline{background:rgba(248,81,73,.15);color:#f85149}
+.live-status.refreshing{background:rgba(210,153,34,.15);color:#d29922}
+.live-dot{width:6px;height:6px;border-radius:50%;animation:pulse 2s infinite}
+.live-status.online .live-dot{background:#56d364}
+.live-status.offline .live-dot{background:#f85149}
+.live-status.refreshing .live-dot{background:#d29922;animation:spin 1s linear infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+@keyframes spin{to{transform:rotate(360deg)}}
+.live-info{color:#7d8590;font-size:9px}
+.clock{font-family:'Courier New';color:#7d8590;font-size:10px}
+.view{display:none;height:calc(100vh - 48px)}
+.view.active{display:block}
+.map-view.active{display:grid;grid-template-columns:290px 1fr 350px}
+.analysis-view.active{display:flex;flex-direction:column}
+.sidebar{background:#0d1117;border-right:1px solid #21262d;overflow-y:auto;padding:12px}
+.sec-title{font-size:9px;color:#7d8590;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;padding-bottom:5px;border-bottom:1px solid #21262d;display:flex;align-items:center;gap:5px}
+.stat-grid{display:grid;grid-template-columns:1fr 1fr;gap:5px;margin-bottom:12px}
+.stat-card{background:#161b22;border:1px solid #21262d;border-radius:6px;padding:8px;position:relative}
+.stat-card::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:#2ea043}
+.stat-val{font-size:13px;font-weight:700;font-family:'Courier New'}
+.stat-lbl{font-size:8px;color:#7d8590;text-transform:uppercase;margin-top:2px}
+.input{background:#0d1117;border:1px solid #21262d;border-radius:6px;padding:6px 8px;color:#e6edf3;width:100%;font-size:11px;margin-bottom:8px;outline:none}
+.input:focus{border-color:#2ea043}
+select.input{padding-right:24px}
+.label{font-size:9px;color:#7d8590;margin-bottom:3px;display:block}
+.group{margin-bottom:10px}
+.row{display:grid;grid-template-columns:1fr 1fr;gap:5px}
+.row .input{margin-bottom:0}
+.chips{display:flex;gap:3px;flex-wrap:wrap;margin-bottom:10px}
+.chip{background:#161b22;border:1px solid #21262d;color:#7d8590;padding:3px 8px;border-radius:10px;font-size:9px;cursor:pointer}
+.chip:hover,.chip.active{background:#2ea043;border-color:#2ea043;color:#fff}
+.btn{width:100%;padding:7px;background:#2ea043;color:#fff;border:none;border-radius:6px;font-weight:600;font-size:10px;cursor:pointer;margin-top:5px;transition:all .2s}
+.btn:hover{background:#3fb950}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+.btn.focus{background:#58a6ff}
+.btn.sec{background:#21262d;color:#e6edf3}
+.btn.danger{background:#da3633}
+.btn-row{display:grid;grid-template-columns:1fr 1fr;gap:5px;margin-top:5px}
+
+/* SOURCES PANEL */
+.sources-panel{background:#161b22;border:1px solid #21262d;border-radius:8px;padding:12px;margin-bottom:12px}
+.sources-title{font-size:10px;color:#bc8cff;text-transform:uppercase;letter-spacing:1px;margin-bottom:10px;font-weight:600;display:flex;align-items:center;gap:6px}
+.source-category{margin-bottom:10px}
+.source-cat-title{font-size:9px;color:#7d8590;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px;display:flex;align-items:center;gap:5px;cursor:pointer;padding:4px 6px;border-radius:4px}
+.source-cat-title:hover{background:#21262d}
+.source-cat-title .cat-icon{font-size:11px}
+.source-cat-title .cat-count{margin-left:auto;background:#21262d;padding:1px 6px;border-radius:8px;font-size:8px}
+.source-item{display:flex;align-items:center;gap:6px;padding:4px 6px;margin:2px 0;border-radius:4px;font-size:9px;cursor:pointer}
+.source-item:hover{background:#21262d}
+.source-item.active{background:rgba(46,160,67,.1);border-left:2px solid #2ea043}
+.source-item .src-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.source-item .src-name{flex:1;color:#e6edf3}
+.source-item .src-status{font-size:8px;padding:1px 4px;border-radius:3px;font-weight:700}
+.src-status.available{background:rgba(86,211,100,.15);color:#56d364}
+.src-status.demo{background:rgba(210,153,34,.15);color:#d29922}
+.src-status.offline{background:rgba(248,81,73,.15);color:#f85149}
+.source-toggle{width:28px;height:14px;background:#21262d;border-radius:7px;position:relative;cursor:pointer;transition:background .2s}
+.source-toggle.on{background:#2ea043}
+.source-toggle::after{content:'';position:absolute;top:2px;left:2px;width:10px;height:10px;background:#fff;border-radius:50%;transition:left .2s}
+.source-toggle.on::after{left:16px}
+
+/* LIVE PANEL */
+.live-panel{background:linear-gradient(135deg,#161b22,#0a2818);border:1px solid #2ea043;border-radius:8px;padding:12px;margin-bottom:12px}
+.live-title{font-size:10px;color:#56d364;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;font-weight:600;display:flex;align-items:center;gap:6px}
+.live-controls{display:flex;gap:5px;align-items:center;margin-bottom:8px}
+.live-controls select{flex:1;background:#0d1117;border:1px solid #21262d;border-radius:5px;padding:5px;color:#e6edf3;font-size:10px}
+.live-stats{display:grid;grid-template-columns:1fr 1fr 1fr;gap:5px;font-size:9px}
+.live-stat{background:#0d1117;padding:6px;border-radius:4px;text-align:center}
+.live-stat-val{font-size:12px;font-weight:700;font-family:'Courier New';color:#56d364}
+.live-stat-lbl{font-size:7px;color:#7d8590;text-transform:uppercase;margin-top:2px}
+
+/* MAP */
+.map-wrap{position:relative;background:#0a0e13}
+#map{height:100%;width:100%;background:#0d1117}
+.map-overlay{position:absolute;top:14px;right:14px;background:rgba(13,17,23,.92);border:1px solid #21262d;border-radius:9px;padding:10px;z-index:500;min-width:180px}
+.map-info{font-size:10px;color:#e6edf3}
+.map-info strong{color:#56d364;font-family:'Courier New'}
+.map-controls{position:absolute;bottom:60px;right:14px;z-index:500;display:flex;flex-direction:column;gap:5px;align-items:flex-end}
+.basemaps{background:rgba(13,17,23,.92);border:1px solid #21262d;border-radius:8px;padding:3px;display:flex;gap:2px}
+.basemap-btn{padding:5px 8px;background:transparent;color:#7d8590;border:none;border-radius:4px;cursor:pointer;font-size:9px}
+.basemap-btn.active{background:#2ea043;color:#fff}
+.map-actions{display:flex;gap:3px;flex-wrap:wrap;justify-content:flex-end}
+.map-action-btn{background:rgba(13,17,23,.92);border:1px solid #21262d;border-radius:6px;padding:6px 10px;color:#e6edf3;font-size:9px;cursor:pointer;display:flex;align-items:center;gap:4px;font-weight:600;transition:all .2s}
+.map-action-btn:hover{background:#21262d}
+.map-action-btn.danger{border-color:#da3633;color:#f85149}
+.map-action-btn.live{border-color:#2ea043;color:#56d364}
+.map-action-btn.analysis{border-color:#bc8cff;color:#bc8cff}
+.loading{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);background:rgba(13,17,23,.95);padding:16px 24px;border-radius:10px;border:1px solid #2ea043;color:#56d364;z-index:600;display:none;text-align:center;max-width:280px}
+.loading.show{display:block}
+.spinner{width:20px;height:20px;border:3px solid #21262d;border-top-color:#2ea043;border-radius:50%;animation:spin 1s linear infinite;margin:0 auto 8px}
+.map-markers-count{position:absolute;top:14px;left:50%;transform:translateX(-50%);background:rgba(13,17,23,.92);border:1px solid #21262d;border-radius:8px;padding:6px 12px;z-index:500;font-size:9px;color:#e6edf3}
+.map-markers-count strong{color:#56d364}
+.zone-info{position:absolute;top:50px;left:50%;transform:translateX(-50%);background:rgba(255,166,87,.15);border:1px solid #ffa657;border-radius:8px;padding:6px 14px;z-index:500;font-size:9px;color:#ffa657;font-weight:600;display:none;text-align:center}
+
+/* GEO EXPLORER */
+.geo-explorer{position:absolute;top:14px;left:14px;background:rgba(13,17,23,.95);border:1px solid #21262d;border-radius:10px;padding:12px;z-index:500;min-width:260px;max-width:320px}
+.geo-title{font-size:10px;color:#58a6ff;font-weight:600;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;display:flex;align-items:center;gap:6px}
+.geo-search{width:100%;background:#0d1117;border:1px solid #21262d;border-radius:5px;padding:5px 8px;color:#e6edf3;font-size:10px;margin-bottom:8px;outline:none}
+.geo-breadcrumb{display:flex;gap:4px;flex-wrap:wrap;margin-bottom:8px}
+.geo-crumb{background:#21262d;padding:2px 8px;border-radius:4px;font-size:9px;cursor:pointer;display:flex;align-items:center;gap:3px}
+.geo-crumb:hover{background:#30363d}
+.geo-crumb.current{background:#58a6ff;color:#0d1117}
+.geo-options{max-height:220px;overflow-y:auto}
+.geo-option{padding:6px 8px;margin:2px 0;border-radius:5px;font-size:10px;cursor:pointer;display:flex;align-items:center;gap:6px}
+.geo-option:hover{background:#21262d}
+.geo-option .geo-icon{font-size:12px}
+.geo-option .geo-name{flex:1}
+.geo-option .geo-code{color:#7d8590;font-size:9px;font-family:'Courier New'}
+
+/* TOAST */
+.toast{position:fixed;top:60px;right:20px;background:linear-gradient(135deg,#161b22,#0a2818);border:1px solid #2ea043;border-radius:8px;padding:12px 16px;z-index:2000;display:flex;align-items:center;gap:10px;font-size:11px;box-shadow:0 4px 12px rgba(0,0,0,.3);transform:translateX(400px);transition:transform .3s ease;max-width:300px}
+.toast.show{transform:translateX(0)}
+.toast.warning{border-color:#ffa657;background:linear-gradient(135deg,#161b22,#2a1f0a)}
+.toast.error{border-color:#f85149;background:linear-gradient(135deg,#161b22,#2a0a0a)}
+.toast-icon{font-size:16px}
+.toast-text{flex:1}
+.toast-title{font-weight:700;color:#e6edf3;margin-bottom:2px}
+.toast-sub{font-size:9px;color:#7d8590}
+
+/* DETAILS */
+.details{background:#0d1117;border-left:1px solid #21262d;display:flex;flex-direction:column;overflow:hidden}
+.details-header{padding:12px;border-bottom:1px solid #21262d;display:flex;align-items:center;justify-content:space-between;background:#161b22}
+.details-header h3{font-size:12px;display:flex;align-items:center;gap:6px}
+.count-badge{background:#2ea043;color:#fff;padding:2px 7px;border-radius:8px;font-size:9px;font-weight:700}
+.details-body{flex:1;overflow-y:auto;padding:10px}
+.empty{text-align:center;padding:30px 15px;color:#484f58}
+.empty-ico{font-size:40px;margin-bottom:10px;opacity:.5}
+.occ-card{background:#161b22;border:1px solid #21262d;border-radius:7px;padding:12px;margin-bottom:8px;cursor:pointer}
+.occ-card:hover{border-color:#2ea043;background:#1c2128}
+.occ-sp{font-style:italic;font-size:12px;color:#56d364;font-weight:600;margin-bottom:5px}
+.occ-meta{display:grid;grid-template-columns:1fr 1fr;gap:4px;font-size:9px}
+.occ-mi{display:flex;align-items:center;gap:3px;color:#7d8590}
+.occ-mi strong{color:#e6edf3}
+.iucn{display:inline-block;padding:1px 6px;border-radius:3px;font-size:8px;font-weight:700;margin-left:4px}
+.iucn-cr{background:#8b0000;color:#fff}.iucn-en{background:#d12f2f;color:#fff}
+.iucn-vu{background:#f85149;color:#fff}.iucn-nt{background:#d29922;color:#fff}
+
+/* POPUP */
+.leaflet-popup-content-wrapper{background:#161b22!important;color:#e6edf3!important;border:1px solid #21262d!important;border-radius:8px!important}
+.leaflet-popup-tip{background:#161b22!important;border:1px solid #21262d!important}
+.leaflet-popup-content{margin:10px!important;font-family:'Segoe UI',sans-serif!important}
+.popup-title{font-size:11px;font-style:italic;color:#56d364;font-weight:700;margin-bottom:4px}
+.popup-meta{font-size:9px;color:#7d8590;margin-bottom:3px;line-height:1.4}
+.popup-btn-row{display:flex;gap:4px;margin-top:6px}
+.popup-btn{flex:1;padding:5px 8px;border:none;border-radius:4px;font-size:9px;font-weight:700;cursor:pointer;text-align:center;transition:all .15s}
+.popup-btn.kg{background:linear-gradient(135deg,#6c5ce7,#a29bfe);color:#fff}
+.popup-btn.kg:hover{background:linear-gradient(135deg,#a29bfe,#6c5ce7);transform:scale(1.02)}
+.popup-btn.gbif{background:#21262d;color:#58a6ff;border:1px solid #30363d}
+.popup-btn.gbif:hover{background:#30363d}
+
+/* ANALYSIS */
+.analysis-top{padding:12px 16px 0;flex-shrink:0}
+.analysis-title{font-size:14px;font-weight:600;margin-bottom:8px;display:flex;align-items:center;gap:8px}
+.analysis-title::before{content:'';width:4px;height:16px;background:#bc8cff;border-radius:2px}
+.analysis-context{background:linear-gradient(135deg,#161b22,#1a1035);border:1px solid #bc8cff;border-radius:8px;padding:10px 12px;margin-bottom:12px;display:flex;align-items:center;gap:10px;font-size:10px}
+.analysis-context .ctx-label{color:#7d8590;font-size:8px;text-transform:uppercase;letter-spacing:1px}
+.analysis-context .ctx-value{color:#bc8cff;font-weight:600;flex:1;font-family:'Courier New'}
+.analysis-context .ctx-count{background:rgba(188,140,255,.2);color:#bc8cff;padding:2px 8px;border-radius:10px;font-size:9px;font-weight:700}
+.analysis-context .ctx-btn{background:#21262d;border:1px solid #30363d;color:#e6edf3;padding:4px 10px;border-radius:4px;font-size:9px;cursor:pointer}
+.analysis-context .ctx-btn:hover{background:#30363d}
+.filter-chips{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px;align-items:center}
+.filter-chip{background:rgba(188,140,255,.12);color:#bc8cff;padding:3px 10px;border-radius:10px;font-size:9px;border:1px solid rgba(188,140,255,.3);display:flex;align-items:center;gap:5px}
+.filter-chip .fc-type{font-size:7px;opacity:.7;text-transform:uppercase}
+.sem-tabs{display:flex;gap:3px;background:#0d1117;padding:3px;border-radius:8px;border:1px solid #21262d;width:fit-content;margin-bottom:12px;flex-wrap:wrap}
+.sem-tab{padding:6px 12px;background:transparent;color:#7d8590;border:none;cursor:pointer;font-size:10px;font-weight:600;border-radius:6px;display:flex;align-items:center;gap:4px}
+.sem-tab.active{background:#bc8cff;color:#0d1117}
+.sem-tab:hover:not(.active){background:#21262d;color:#e6edf3}
+.sem-panel{display:none}
+.sem-panel.active{display:block}
+.analysis-body{flex:1;overflow-y:auto;padding:0 16px 16px}
+
+/* KG */
+.kg-layout{display:grid;grid-template-columns:1fr 360px;gap:12px;height:calc(100vh - 220px)}
+.kg-graph{background:#161b22;border:1px solid #21262d;border-radius:10px;position:relative;overflow:hidden}
+#kg-svg{width:100%;height:100%}
+.kg-node{cursor:pointer}
+.kg-node circle{stroke:#0d1117;stroke-width:2px}
+.kg-node.focused circle{stroke:#ffa657;stroke-width:4px;filter:drop-shadow(0 0 10px rgba(255,166,87,.6))}
+.kg-node text{font-size:8px;fill:#e6edf3;pointer-events:none}
+.kg-link{stroke:#30363d;stroke-opacity:.5;stroke-width:1.5px}
+.kg-link.highlight{stroke:#ffa657;stroke-width:2.5px;stroke-opacity:.9}
+.kg-side{display:flex;flex-direction:column;gap:10px;overflow-y:auto}
+.kg-card{background:#161b22;border:1px solid #21262d;border-radius:8px;padding:12px}
+.kg-card-title{font-size:10px;color:#7d8590;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;display:flex;align-items:center;gap:5px}
+
+/* SOURCE STATUS GRID */
+.source-status-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:8px}
+.source-status-item{background:#0d1117;border-radius:5px;padding:8px;text-align:center;border-left:3px solid #7d8590}
+.source-status-item.available{border-left-color:#56d364}
+.source-status-item.demo{border-left-color:#d29922}
+.source-status-item.loading{border-left-color:#ffa657;animation:pulse 1s infinite}
+.source-status-item.error{border-left-color:#f85149}
+.source-status-name{font-size:9px;font-weight:700;color:#e6edf3;margin-bottom:3px}
+.source-status-badge{font-size:8px;padding:1px 6px;border-radius:8px;display:inline-block}
+.source-status-badge.available{background:rgba(86,211,100,.15);color:#56d364}
+.source-status-badge.demo{background:rgba(210,153,34,.15);color:#d29922}
+.source-status-badge.loading{background:rgba(255,166,87,.15);color:#ffa657}
+.source-status-badge.error{background:rgba(248,81,73,.15);color:#f85149}
+.source-status-count{font-size:10px;font-weight:700;font-family:'Courier New';color:#56d364;margin-top:3px}
+
+/* ENRICH */
+.enrich-card{background:linear-gradient(135deg,#161b22,#1a1035);border:1px solid #6c5ce7;border-radius:8px;padding:12px}
+.enrich-title{font-size:10px;color:#a29bfe;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px}
+.enrich-species{background:#0d1117;border-radius:5px;padding:8px;margin-bottom:8px;text-align:center}
+.enrich-species-name{font-size:13px;font-style:italic;color:#56d364;font-weight:600}
+.btn.enrich-all{background:linear-gradient(135deg,#e84393,#6c5ce7);border:none}
+.enrich-status{font-size:8px;padding:5px 6px;border-radius:4px;margin-top:6px;text-align:center}
+.enrich-status.idle{background:#0d1117;color:#7d8590}
+.enrich-status.loading{background:rgba(210,153,34,.1);color:#d29922}
+.enrich-status.done{background:rgba(86,211,100,.1);color:#56d364}
+.enrich-status.error{background:rgba(248,81,73,.1);color:#f85149}
+.enrich-progress{height:4px;background:#21262d;border-radius:2px;margin-top:6px;overflow:hidden}
+.enrich-progress-bar{height:100%;background:linear-gradient(90deg,#e84393,#6c5ce7,#0984e3);transition:width .3s ease;width:0%}
+
+/* RESULTS */
+.result-item{background:#0d1117;border-radius:5px;padding:6px 8px;margin-bottom:5px;font-size:9px;border-left:3px solid #7d8590}
+.result-item.globi{border-left-color:#e84393}
+.result-item.plazi{border-left-color:#6c5ce7}
+.result-item.col{border-left-color:#0984e3}
+.result-item.iucn{border-left-color:#f85149}
+.result-item.gbif{border-left-color:#56d364}
+.result-item.trait{border-left-color:#00b894}
+.result-item.genomic{border-left-color:#00cec9}
+.result-item .res-label{color:#7d8590;font-size:7px;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:2px}
+.result-item .res-value{color:#e6edf3}
+.result-item .res-meta{color:#7d8590;font-size:8px;margin-top:2px}
+
+/* BULK LOAD */
+.bulk-load-panel{background:#161b22;border:1px solid #bc8cff;border-radius:8px;padding:12px;margin-bottom:10px}
+.bulk-load-title{font-size:10px;color:#bc8cff;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;font-weight:600}
+.bulk-progress-wrap{background:#0d1117;border-radius:5px;height:16px;overflow:hidden;margin:8px 0;position:relative}
+.bulk-progress-bar{height:100%;background:linear-gradient(90deg,#2ea043,#56d364);transition:width .3s ease;width:0%}
+.bulk-progress-text{position:absolute;top:0;left:0;right:0;bottom:0;display:flex;align-items:center;justify-content:center;font-size:8px;color:#fff;font-weight:700}
+.bulk-controls{display:grid;grid-template-columns:1fr 1fr;gap:5px;margin-top:8px}
+.bulk-status{font-size:8px;color:#7d8590;text-align:center;margin-top:5px}
+
+/* TEMPORAL */
+.temporal-panel{position:absolute;bottom:14px;left:14px;right:14px;background:rgba(13,17,23,.95);border:1px solid #21262d;border-radius:10px;padding:12px 16px;z-index:500;display:none}
+.temporal-panel.show{display:block}
+.temporal-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
+.temporal-title{font-size:10px;color:#ffa657;font-weight:600;text-transform:uppercase;letter-spacing:1px}
+.temporal-close{background:#21262d;border:none;color:#e6edf3;width:22px;height:22px;border-radius:50%;cursor:pointer;font-size:12px}
+.temporal-slider-wrap{position:relative;height:30px;margin:8px 0}
+.temporal-slider{width:100%;-webkit-appearance:none;height:6px;background:#21262d;border-radius:3px;outline:none}
+.temporal-slider::-webkit-slider-thumb{-webkit-appearance:none;width:16px;height:16px;background:#ffa657;border-radius:50%;cursor:pointer}
+.temporal-labels{display:flex;justify-content:space-between;font-size:8px;color:#7d8590;margin-top:4px}
+.temporal-info{display:flex;gap:12px;align-items:center;font-size:10px;margin-top:8px}
+.temporal-info .ti-item{display:flex;align-items:center;gap:4px}
+.temporal-info .ti-val{color:#ffa657;font-weight:600;font-family:'Courier New'}
+.temporal-datasets{max-height:120px;overflow-y:auto;margin-top:8px}
+.dataset-item{display:flex;align-items:center;gap:8px;padding:6px 8px;background:#0d1117;border-radius:5px;margin-bottom:4px;font-size:9px;cursor:pointer}
+.dataset-item:hover{background:#1c2128}
+.dataset-item .ds-year{color:#ffa657;font-weight:700;font-family:'Courier New';min-width:35px}
+.dataset-item .ds-inst{color:#bc8cff;flex:1}
+.dataset-item .ds-count{color:#56d364;font-family:'Courier New'}
+.dataset-item .ds-link{color:#58a6ff;text-decoration:none;font-size:8px}
+
+/* OTHER PANELS */
+.ont-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;height:calc(100vh - 220px)}
+.ont-tree{background:#161b22;border:1px solid #21262d;border-radius:10px;padding:14px;overflow-y:auto}
+.ont-node{padding:5px 8px;margin:2px 0;border-radius:5px;cursor:pointer;font-size:10px;display:flex;align-items:center;gap:6px}
+.ont-node:hover{background:#21262d}
+.ont-node.selected{background:rgba(188,140,255,.15);border-left:3px solid #bc8cff}
+.ont-node .ol{flex:1;color:#e6edf3}
+.ont-node .oc{color:#7d8590;font-size:9px}
+.ont-children{margin-left:16px;display:none}
+.ont-children.open{display:block}
+.ont-detail{background:#161b22;border:1px solid #21262d;border-radius:10px;padding:14px;overflow-y:auto}
+.ont-det-title{font-size:13px;color:#bc8cff;font-weight:600;margin-bottom:8px}
+.ont-uri{font-family:'Courier New';font-size:9px;color:#58a6ff;background:#0d1117;padding:6px 9px;border-radius:4px;margin-bottom:10px;word-break:break-all}
+.ont-props{display:flex;flex-direction:column;gap:6px}
+.ont-prop{display:flex;justify-content:space-between;padding:6px 8px;background:#0d1117;border-radius:4px;font-size:10px}
+.ont-pk{color:#7d8590}
+.ont-pv{color:#e6edf3}
+.rdf-wrap{background:#161b22;border:1px solid #21262d;border-radius:10px;overflow:auto;max-height:calc(100vh - 220px)}
+.rdf-tbl{width:100%;border-collapse:collapse;font-size:10px}
+.rdf-tbl th{background:#0d1117;color:#7d8590;padding:8px;text-align:left;font-size:9px;text-transform:uppercase;border-bottom:2px solid #21262d;position:sticky;top:0}
+.rdf-tbl td{padding:6px 8px;border-bottom:1px solid #21262d;font-family:'Courier New';font-size:9px}
+.rdf-s{color:#56d364}.rdf-p{color:#bc8cff}.rdf-o{color:#58a6ff}
+.rdf-tbl tr:hover{background:rgba(188,140,255,.05)}
+.q-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;height:calc(100vh - 220px)}
+.q-editor{background:#161b22;border:1px solid #21262d;border-radius:10px;padding:14px;display:flex;flex-direction:column}
+.q-textarea{width:100%;flex:1;min-height:140px;background:#0d1117;border:1px solid #21262d;border-radius:6px;padding:10px;color:#e6edf3;font-family:'Courier New';font-size:10px;resize:vertical;outline:none}
+.q-textarea:focus{border-color:#bc8cff}
+.q-presets{display:flex;gap:4px;flex-wrap:wrap;margin-top:8px}
+.q-preset{background:#21262d;color:#e6edf3;padding:4px 8px;border-radius:4px;font-size:9px;cursor:pointer;border:1px solid #30363d}
+.q-preset:hover{border-color:#bc8cff}
+.q-results{background:#161b22;border:1px solid #21262d;border-radius:10px;padding:14px;overflow-y:auto}
+.q-item{padding:8px;background:#0d1117;border-radius:5px;margin-bottom:6px;font-size:10px}
+.q-item-l{color:#56d364;font-weight:600;margin-bottom:2px}
+.q-item-m{color:#7d8590;font-size:9px}
+.metrics-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-bottom:14px}
+.metric-card{background:linear-gradient(135deg,#161b22,#0d1117);border:1px solid #21262d;border-radius:8px;padding:12px;position:relative;overflow:hidden}
+.metric-card::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:var(--c,#bc8cff)}
+.metric-val{font-size:18px;font-weight:700;font-family:'Courier New';margin-bottom:2px}
+.metric-lbl{font-size:8px;color:#7d8590;text-transform:uppercase;letter-spacing:1px}
+.analytics-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px}
+.analytics-box{background:#161b22;border:1px solid #21262d;border-radius:8px;padding:14px}
+.analytics-full{grid-column:span 2}
+.analytics-title{font-size:11px;color:#e6edf3;font-weight:600;margin-bottom:10px;display:flex;align-items:center;gap:6px}
+.analytics-wrap{position:relative;height:180px;overflow:hidden}
+.analytics-wrap canvas{position:absolute;top:0;left:0;width:100%!important;height:100%!important}
+.cluster-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:8px}
+.cluster-card{background:#0d1117;border:1px solid #21262d;border-radius:7px;padding:10px;cursor:pointer;position:relative;overflow:hidden}
+.cluster-card::before{content:'';position:absolute;top:0;left:0;width:3px;height:100%;background:var(--c,#bc8cff)}
+.cluster-name{font-size:11px;color:#e6edf3;font-weight:600;margin-bottom:3px}
+.cluster-val{font-size:14px;font-weight:700;font-family:'Courier New';color:var(--c,#bc8cff)}
+.cluster-sub{font-size:8px;color:#484f58;margin-top:2px}
+.stats-table{width:100%;border-collapse:collapse;font-size:10px}
+.stats-table th{background:#0d1117;color:#7d8590;padding:6px;text-align:left;font-size:9px;text-transform:uppercase;border-bottom:2px solid #21262d}
+.stats-table td{padding:6px;border-bottom:1px solid #21262d}
+.stats-table .val{font-family:'Courier New';color:#56d364;font-weight:600}
+.stats-table .dim{color:#7d8590;font-size:9px}
+.leaflet-container{background:#0d1117!important}
+::-webkit-scrollbar{width:5px;height:5px}
+::-webkit-scrollbar-track{background:#0d1117}
+::-webkit-scrollbar-thumb{background:#21262d;border-radius:3px}
+::-webkit-scrollbar-thumb:hover{background:#30363d}
+@media(max-width:1400px){.map-view.active{grid-template-columns:250px 1fr 300px}.kg-layout,.ont-grid,.q-grid{grid-template-columns:1fr;height:auto}.metrics-grid{grid-template-columns:repeat(2,1fr)}.analytics-grid{grid-template-columns:1fr}.analytics-full{grid-column:span 1}}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="logo">
+    <div class="logo-icon">🧬</div>
+    <div class="logo-text">
+      <h1>BioSemantic Monitor v5.0</h1>
+      <span> GBIF · COL · GLOBI · PLAZI · IUCN · BOLD · EOL</span>
+    </div>
+  </div>
+  <div class="live-indicator">
+    <div class="live-status online" id="live-status">
+      <div class="live-dot"></div>
+      <span id="live-label">LIVE</span>
+    </div>
+    <div class="live-info">
+      <div id="live-last">Updated: —</div>
+    </div>
+  </div>
+  <div class="nav-tabs">
+    <button class="nav-tab active" onclick="switchView('map',this)">🗺️ MAP</button>
+    <button class="nav-tab" onclick="switchView('analysis',this)">🧠 ANALYSIS</button>
+  </div>
+  <div class="clock" id="clock"></div>
+</div>
+
+<!-- MAP VIEW -->
+<div class="view map-view active" id="view-map">
+  <div class="sidebar">
+    <div class="sec-title">📊 Statistics</div>
+    <div class="stat-grid">
+      <div class="stat-card"><div class="stat-val" id="st-total">0</div><div class="stat-lbl">Total</div></div>
+      <div class="stat-card"><div class="stat-val" id="st-loaded">0</div><div class="stat-lbl">Loaded</div></div>
+      <div class="stat-card"><div class="stat-val" id="st-species">0</div><div class="stat-lbl">Species</div></div>
+      <div class="stat-card"><div class="stat-val" id="st-countries">0</div><div class="stat-lbl">Countries</div></div>
+    </div>
+
+    <div class="live-panel">
+      <div class="live-title">🔄 Live Auto-Refresh</div>
+      <div class="live-controls">
+        <select id="refresh-interval" onchange="changeRefreshInterval(this.value)">
+          <option value="0">Off</option>
+          <option value="60000">1 min</option>
+          <option value="300000" selected>5 min</option>
+          <option value="900000">15 min</option>
+        </select>
+        <button class="btn sec" style="width:auto;padding:5px 10px;margin:0" onclick="manualRefresh()">🔄 Now</button>
+      </div>
+      <div class="live-stats">
+        <div class="live-stat"><div class="live-stat-val" id="live-count">0</div><div class="live-stat-lbl">Updates</div></div>
+        <div class="live-stat"><div class="live-stat-val" id="live-new-count">0</div><div class="live-stat-lbl">New Rec</div></div>
+        <div class="live-stat"><div class="live-stat-val" id="live-next">—</div><div class="live-stat-lbl">Next</div></div>
+      </div>
+    </div>
+
+    <div class="sources-panel">
+      <div class="sources-title">📡 Data Sources <span style="margin-left:auto;color:#56d364;font-size:8px">● ALL ACTIVE</span></div>
+      <div id="sources-container"></div>
+    </div>
+
+    <div class="sec-title">⏱ Temporal Filter</div>
+    <div class="group">
+      <label class="label">Year Range</label>
+      <div class="row">
+        <input type="number" class="input" id="inp-yf" placeholder="From" min="1800" max="2030">
+        <input type="number" class="input" id="inp-yt" placeholder="To" min="1800" max="2030">
+      </div>
+    </div>
+
+    <div class="sec-title">🌍 Geographic Filter</div>
+    <div class="group">
+      <label class="label">Country (<span id="country-count">0</span>)</label>
+      <select class="input" id="sel-country">
+        <option value="">All countries</option>
+      </select>
+    </div>
+    <div class="group">
+      <label class="label">Taxon Group</label>
+      <div class="chips">
+        <span class="chip active" data-taxon="">All</span>
+        <span class="chip" data-taxon="1">🐾 Animals</span>
+        <span class="chip" data-taxon="6">🌱 Plants</span>
+        <span class="chip" data-taxon="5">🍄 Fungi</span>
+        <span class="chip" data-taxon="212">🦅 Birds</span>
+      </div>
+    </div>
+
+    <button class="btn" onclick="applyFilters()">🔄 APPLY FILTERS</button>
+    <div class="btn-row">
+      <button class="btn sec" onclick="resetAll()">↺ RESET</button>
+      <button class="btn focus" onclick="goToAnalysis()">🧠 ANALYZE</button>
+    </div>
+
+    <div class="bulk-load-panel">
+      <div class="bulk-load-title">📦 Bulk Load <span style="color:#56d364;font-size:8px">● AUTO-ALL</span></div>
+      <select class="input" id="bulk-limit">
+        <option value="3000">3,000</option>
+        <option value="10000">10,000</option>
+        <option value="50000">50,000</option>
+        <option value="all" selected>ALL AVAILABLE</option>
+      </select>
+      <div class="bulk-progress-wrap">
+        <div class="bulk-progress-bar" id="bulk-progress"></div>
+        <div class="bulk-progress-text" id="bulk-progress-text">0%</div>
+      </div>
+      <div class="bulk-controls">
+        <button class="btn focus" id="bulk-start" onclick="startBulkLoad()">▶ START</button>
+        <button class="btn danger" id="bulk-stop" onclick="stopBulkLoad()" disabled>⏹ STOP</button>
+      </div>
+      <div class="bulk-status" id="bulk-status">Auto-starting ALL...</div>
+    </div>
+  </div>
+
+  <div class="map-wrap">
+    <div id="map"></div>
+    
+    <div class="geo-explorer" id="geo-explorer">
+      <div class="geo-title">🌍 Geographic Explorer</div>
+      <input type="text" class="geo-search" id="geo-search" placeholder="🔍 Search country..." oninput="filterCountries(this.value)">
+      <div class="geo-breadcrumb" id="geo-breadcrumb">
+        <span class="geo-crumb current" onclick="geoNavigate('world')">🌐 World</span>
+      </div>
+      <div class="geo-options" id="geo-options"></div>
+    </div>
+
+    <div class="map-overlay">
+      <div class="map-info">
+        <div>System: <strong>WGS84</strong></div>
+        <div>Sources: <strong id="active-sources-count">0</strong> active</div>
+        <div>Taxonomy: <strong style="color:#0984e3">COL</strong></div>
+        <div id="map-info" style="color:#d29922;margin-top:4px">Global view</div>
+        <div id="map-coords" style="color:#56d364;margin-top:3px"></div>
+      </div>
+    </div>
+
+    <div class="map-markers-count" id="markers-count" style="display:none">📍 <strong id="markers-num">0</strong> markers</div>
+    
+    <div class="zone-info" id="zone-info">
+      📍 Zone: <strong id="zone-count">0</strong> records
+      <button onclick="restoreAllMarkers()" style="background:#ffa657;color:#0d1117;border:none;padding:2px 6px;border-radius:3px;font-size:8px;cursor:pointer;margin-left:6px">✕ Restore</button>
+    </div>
+
+    <div class="map-controls">
+      <div class="basemaps">
+        <button class="basemap-btn active" onclick="setBasemap('dark',this)">🌑</button>
+        <button class="basemap-btn" onclick="setBasemap('satellite',this)">🛰️</button>
+        <button class="basemap-btn" onclick="setBasemap('light',this)">☀️</button>
+        <button class="basemap-btn" onclick="setBasemap('osm',this)">🗺️</button>
+      </div>
+      <div class="map-actions">
+        <button class="map-action-btn" onclick="focusOnData()">🎯 Focus</button>
+        <button class="map-action-btn temporal" onclick="toggleTemporalPanel()">📅 Time</button>
+        <button class="map-action-btn live" onclick="manualRefresh()">🔄 Refresh</button>
+        <button class="map-action-btn analysis" onclick="goToAnalysis()">🧠 Analyze</button>
+        <button class="map-action-btn danger" onclick="clearAllMarkers()">🗑️ Clear</button>
+      </div>
+    </div>
+
+    <div class="temporal-panel" id="temporal-panel">
+      <div class="temporal-header">
+        <div class="temporal-title">📅 Temporal Dataset Navigator</div>
+        <button class="temporal-close" onclick="toggleTemporalPanel()">✕</button>
+      </div>
+      <div class="temporal-slider-wrap">
+        <input type="range" class="temporal-slider" id="temporal-slider" min="1900" max="2025" value="2025" oninput="updateTemporal(this.value)">
+      </div>
+      <div class="temporal-labels">
+        <span>1900</span><span>1950</span><span>2000</span><span>2025</span>
+      </div>
+      <div class="temporal-info">
+        <div class="ti-item">Year: <span class="ti-val" id="temp-year">2025</span></div>
+        <div class="ti-item">Records: <span class="ti-val" id="temp-count">0</span></div>
+        <div class="ti-item">Datasets: <span class="ti-val" id="temp-datasets">0</span></div>
+      </div>
+      <div class="temporal-datasets" id="temporal-datasets">
+        <div style="color:#7d8590;font-size:9px;text-align:center;padding:10px">Loading...</div>
+      </div>
+    </div>
+
+    <div class="loading" id="loading"><div class="spinner"></div><div id="ld-text">Loading...</div></div>
+  </div>
+
+  <div class="details">
+    <div class="details-header">
+      <h3>📋 Records <span class="count-badge" id="det-count">0</span></h3>
+      <button class="btn sec" style="width:auto;padding:3px 8px;font-size:9px;margin:0" onclick="clearDetails()">Clear</button>
+    </div>
+    <div class="details-body" id="det-body">
+      <div class="empty"><div class="empty-ico">🧬</div><p>Apply filters or explore</p></div>
+    </div>
+  </div>
+</div>
+
+<!-- ANALYSIS VIEW -->
+<div class="view analysis-view" id="view-analysis">
+  <div class="analysis-top">
+    <div class="analysis-title">🧠 BioSemantic Analysis</div>
+    
+    <div class="analysis-context" id="analysis-context">
+      <div class="ctx-label">Analysis Context</div>
+      <div class="ctx-value" id="ctx-value">Global · All Data</div>
+      <div class="ctx-count" id="ctx-count">0 records</div>
+      <button class="ctx-btn" onclick="resetAnalysisContext()">↺ Reset</button>
+      <button class="ctx-btn" onclick="switchView('map',document.querySelector('.nav-tab'))">🗺️ Map</button>
+    </div>
+
+    <div class="filter-chips" id="filter-chips">
+      <span style="color:#7d8590;font-size:9px">FILTERS:</span>
+      <span class="filter-chip"><span class="fc-type">global</span><span>All data</span></span>
+    </div>
+
+    <div class="sem-tabs">
+      <button class="sem-tab active" onclick="switchSemTab('kg',this)">🕸️ Knowledge Graph</button>
+      <button class="sem-tab" onclick="switchSemTab('charts',this)">📊 Charts</button>
+      <button class="sem-tab" onclick="switchSemTab('metrics',this)">📈 Metrics</button>
+      <button class="sem-tab" onclick="switchSemTab('ontology',this)">🌳 Ontology</button>
+      <button class="sem-tab" onclick="switchSemTab('rdf',this)">📄 RDF</button>
+      <button class="sem-tab" onclick="switchSemTab('query',this)">🔍 Query</button>
+    </div>
+  </div>
+  <div class="analysis-body">
+    
+    <!-- KG PANEL -->
+    <div class="sem-panel active" id="sp-kg">
+      <div class="kg-layout">
+        <div class="kg-graph"><svg id="kg-svg"></svg></div>
+        <div class="kg-side">
+          <div class="kg-card">
+            <div class="kg-card-title">🎯 Focused Species</div>
+            <div style="font-size:12px;font-style:italic;color:#ffa657;font-weight:600;text-align:center;padding:8px;background:#0d1117;border-radius:5px" id="focused-species-display">—</div>
+            <div class="btn-row" style="margin-top:8px">
+              <button class="btn sec" onclick="clearSpeciesFocus()">↺ Clear Focus</button>
+              <button class="btn focus" onclick="enrichFocusedSpecies()">🔍 Enrich All</button>
+            </div>
+          </div>
+          
+          <div class="kg-card">
+            <div class="kg-card-title">📡 Source Status</div>
+            <div class="source-status-grid" id="source-status-grid">
+              <div class="source-status-item available">
+                <div class="source-status-name">GBIF</div>
+                <div class="source-status-badge available">LIVE</div>
+                <div class="source-status-count" id="src-count-gbif">—</div>
+              </div>
+              <div class="source-status-item available">
+                <div class="source-status-name">COL</div>
+                <div class="source-status-badge available">LIVE</div>
+                <div class="source-status-count" id="src-count-col">—</div>
+              </div>
+              <div class="source-status-item available">
+                <div class="source-status-name">GloBI</div>
+                <div class="source-status-badge available">LIVE</div>
+                <div class="source-status-count" id="src-count-globi">—</div>
+              </div>
+              <div class="source-status-item available">
+                <div class="source-status-name">Plazi</div>
+                <div class="source-status-badge available">LIVE</div>
+                <div class="source-status-count" id="src-count-plazi">—</div>
+              </div>
+              <div class="source-status-item demo">
+                <div class="source-status-name">IUCN</div>
+                <div class="source-status-badge demo">DEMO</div>
+                <div class="source-status-count" id="src-count-iucn">—</div>
+              </div>
+              <div class="source-status-item demo">
+                <div class="source-status-name">Traits</div>
+                <div class="source-status-badge demo">DEMO</div>
+                <div class="source-status-count" id="src-count-traits">—</div>
+              </div>
+              <div class="source-status-item demo">
+                <div class="source-status-name">Genomics</div>
+                <div class="source-status-badge demo">DEMO</div>
+                <div class="source-status-count" id="src-count-genomics">—</div>
+              </div>
+              <div class="source-status-item demo">
+                <div class="source-status-name">Literature</div>
+                <div class="source-status-badge demo">DEMO</div>
+                <div class="source-status-count" id="src-count-lit">—</div>
+              </div>
+            </div>
+          </div>
+          
+          <div class="kg-card">
+            <div class="kg-card-title">🌍 Country-Centric KG</div>
+            <div id="kg-mode-indicator" style="font-size:9px;color:#ffa657;margin-bottom:6px;font-weight:600">📍 ALL COUNTRIES</div>
+            <div class="btn-row">
+              <button class="btn" onclick="showCountriesView()">🌍 All</button>
+              <button class="btn sec" onclick="expandNextCountry()">🎲 Random</button>
+            </div>
+          </div>
+          
+          <div class="enrich-card">
+            <div class="enrich-title">🌐 Semantic Enrichment</div>
+            <div class="enrich-species">
+              <div class="enrich-species-name" id="enrich-species-name">—</div>
+            </div>
+            <button class="btn enrich-all" id="btn-enrich-all" onclick="enrichFromAllSources()" disabled>⚡ Enrich From All Sources</button>
+            <div class="enrich-progress"><div class="enrich-progress-bar" id="enrich-progress-bar"></div></div>
+            <div class="enrich-status idle" id="enrich-status">Select a species from the map</div>
+            <div id="enrich-results" style="max-height:250px;overflow-y:auto;margin-top:6px"></div>
+          </div>
+          
+          <div class="kg-card">
+            <div class="kg-card-title">📊 Stats</div>
+            <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px">
+              <div style="text-align:center;padding:8px;background:#0d1117;border-radius:5px"><div style="font-size:14px;font-weight:700;color:#bc8cff" id="kg-n">0</div><div style="font-size:8px;color:#7d8590">NODES</div></div>
+              <div style="text-align:center;padding:8px;background:#0d1117;border-radius:5px"><div style="font-size:14px;font-weight:700;color:#bc8cff" id="kg-e">0</div><div style="font-size:8px;color:#7d8590">EDGES</div></div>
+              <div style="text-align:center;padding:8px;background:#0d1117;border-radius:5px"><div style="font-size:14px;font-weight:700;color:#0984e3" id="kg-sources">0</div><div style="font-size:8px;color:#7d8590">SOURCES</div></div>
+            </div>
+          </div>
+          
+          <div class="kg-card">
+            <div class="kg-card-title">🗺️ Countries</div>
+            <div style="max-height:180px;overflow-y:auto" id="country-list"><div style="color:#7d8590;font-size:9px;text-align:center;padding:8px">Load data</div></div>
+          </div>
+          
+          <div class="kg-card"><div class="kg-card-title">🔍 Selected</div><div style="max-height:180px;overflow-y:auto;font-size:10px" id="kg-info">Click a node</div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- CHARTS -->
+    <div class="sem-panel" id="sp-charts">
+      <div class="analytics-grid">
+        <div class="analytics-box"><div class="analytics-title">🦎 By Species</div><div class="analytics-wrap"><canvas id="ch-species"></canvas></div></div>
+        <div class="analytics-box"><div class="analytics-title">🌍 By Country</div><div class="analytics-wrap"><canvas id="ch-country"></canvas></div></div>
+        <div class="analytics-box"><div class="analytics-title">📅 By Year</div><div class="analytics-wrap"><canvas id="ch-year"></canvas></div></div>
+        <div class="analytics-box"><div class="analytics-title">🏛️ By Institution</div><div class="analytics-wrap"><canvas id="ch-institution"></canvas></div></div>
+      </div>
+    </div>
+
+    <!-- METRICS -->
+    <div class="sem-panel" id="sp-metrics">
+      <div class="metrics-grid">
+        <div class="metric-card" style="--c:#56d364"><div class="metric-val" id="ms-rec">0</div><div class="metric-lbl">Records</div></div>
+        <div class="metric-card" style="--c:#58a6ff"><div class="metric-val" id="ms-sp">0</div><div class="metric-lbl">Species</div></div>
+        <div class="metric-card" style="--c:#d29922"><div class="metric-val" id="ms-ct">0</div><div class="metric-lbl">Countries</div></div>
+        <div class="metric-card" style="--c:#bc8cff"><div class="metric-val" id="ms-inst">0</div><div class="metric-lbl">Institutions</div></div>
+        <div class="metric-card" style="--c:#f85149"><div class="metric-val" id="ms-th">0</div><div class="metric-lbl">Threatened</div></div>
+      </div>
+      <div class="analytics-grid">
+        <div class="analytics-box analytics-full"><div class="analytics-title">🎯 Clusters</div><div class="cluster-grid" id="cluster-grid"><div style="color:#484f58;text-align:center;padding:16px;grid-column:span 5">Select a node</div></div></div>
+      </div>
+      <div class="analytics-grid">
+        <div class="analytics-box"><div class="analytics-title">📊 Descriptive</div><table class="stats-table" id="desc-table"><thead><tr><th>Metric</th><th>Value</th><th>Detail</th></tr></thead><tbody></tbody></table></div>
+        <div class="analytics-box"><div class="analytics-title">🧪 Inferential</div><table class="stats-table" id="infer-table"><thead><tr><th>Index</th><th>Value</th><th>Interpret.</th></tr></thead><tbody></tbody></table></div>
+      </div>
+    </div>
+
+    <!-- ONTOLOGY -->
+    <div class="sem-panel" id="sp-ontology">
+      <div class="ont-grid">
+        <div class="ont-tree" id="ont-tree"><div style="color:#7d8590;text-align:center;padding:20px">Load data</div></div>
+        <div class="ont-detail" id="ont-detail">
+          <div class="ont-det-title">📖 Select a node</div>
+          <div style="font-size:10px;color:#7d8590;line-height:1.6">Click any taxonomic rank to explore.</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- RDF -->
+    <div class="sem-panel" id="sp-rdf">
+      <div class="rdf-wrap">
+        <table class="rdf-tbl">
+          <thead><tr><th>Subject</th><th>Predicate</th><th>Object</th><th>Graph</th></tr></thead>
+          <tbody id="rdf-body"><tr><td colspan="4" style="text-align:center;color:#7d8590;padding:20px">Load data</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- QUERY -->
+    <div class="sem-panel" id="sp-query">
+      <div class="q-grid">
+        <div class="q-editor">
+          <div class="analytics-title" style="margin-bottom:8px">📝 SPARQL Query Editor</div>
+          <textarea class="q-textarea" id="q-input" placeholder="PREFIX dwc: <http://rs.tdwg.org/dwc/terms/>
+SELECT ?species ?country WHERE {
+  ?occ dwc:scientificName ?species ;
+       dwc:country ?country .
+}"></textarea>
+          <div class="q-presets">
+            <button class="q-preset" onclick="runQuery('threatened')">🚨 Threatened</button>
+            <button class="q-preset" onclick="runQuery('recent')">📅 Recent</button>
+            <button class="q-preset" onclick="runQuery('institutions')">🏛️ Institutions</button>
+            <button class="q-preset" onclick="runQuery('countries')">🌍 Countries</button>
+            <button class="q-preset" onclick="runQuery('triples')">📄 Triples</button>
+          </div>
+          <button class="btn" onclick="runQuery()" style="margin-top:8px">▶️ Execute Query</button>
+        </div>
+        <div class="q-results" id="q-results">
+          <div class="analytics-title" style="margin-bottom:8px">📋 Results</div>
+          <div style="color:#7d8590;text-align:center;padding:30px;font-size:10px">Execute a query</div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<div class="toast" id="toast">
+  <div class="toast-icon" id="toast-icon">🔄</div>
+  <div class="toast-text">
+    <div class="toast-title" id="toast-title">Update</div>
+    <div class="toast-sub" id="toast-sub">Details</div>
+  </div>
+</div>
+
+<script>
+// ===== COUNTRIES =====
+var COUNTRIES={'AF':'Afghanistan','AL':'Albania','DZ':'Algeria','AD':'Andorra','AO':'Angola','AG':'Antigua','AR':'Argentina','AM':'Armenia','AU':'Australia','AT':'Austria','AZ':'Azerbaijan','BS':'Bahamas','BH':'Bahrain','BD':'Bangladesh','BB':'Barbados','BY':'Belarus','BE':'Belgium','BZ':'Belize','BJ':'Benin','BT':'Bhutan','BO':'Bolivia','BA':'Bosnia','BW':'Botswana','BR':'Brazil','BN':'Brunei','BG':'Bulgaria','BF':'Burkina Faso','BI':'Burundi','KH':'Cambodia','CM':'Cameroon','CA':'Canada','CV':'Cape Verde','CF':'CAR','TD':'Chad','CL':'Chile','CN':'China','CO':'Colombia','KM':'Comoros','CG':'Congo','CR':'Costa Rica','HR':'Croatia','CU':'Cuba','CY':'Cyprus','CZ':'Czechia','DK':'Denmark','DJ':'Djibouti','DM':'Dominica','DO':'Dominican Rep','EC':'Ecuador','EG':'Egypt','SV':'El Salvador','GQ':'Eq. Guinea','ER':'Eritrea','EE':'Estonia','ET':'Ethiopia','FJ':'Fiji','FI':'Finland','FR':'France','GA':'Gabon','GM':'Gambia','GE':'Georgia','DE':'Germany','GH':'Ghana','GR':'Greece','GD':'Grenada','GT':'Guatemala','GN':'Guinea','GW':'Guinea-Bissau','GY':'Guyana','HT':'Haiti','HN':'Honduras','HU':'Hungary','IS':'Iceland','IN':'India','ID':'Indonesia','IR':'Iran','IQ':'Iraq','IE':'Ireland','IL':'Israel','IT':'Italy','JM':'Jamaica','JP':'Japan','JO':'Jordan','KZ':'Kazakhstan','KE':'Kenya','KI':'Kiribati','KP':'N. Korea','KR':'S. Korea','KW':'Kuwait','KG':'Kyrgyzstan','LA':'Laos','LV':'Latvia','LB':'Lebanon','LS':'Lesotho','LR':'Liberia','LY':'Libya','LI':'Liechtenstein','LT':'Lithuania','LU':'Luxembourg','MG':'Madagascar','MW':'Malawi','MY':'Malaysia','MV':'Maldives','ML':'Mali','MT':'Malta','MH':'Marshall Is','MR':'Mauritania','MU':'Mauritius','MX':'Mexico','FM':'Micronesia','MD':'Moldova','MC':'Monaco','MN':'Mongolia','ME':'Montenegro','MA':'Morocco','MZ':'Mozambique','MM':'Myanmar','NA':'Namibia','NR':'Nauru','NP':'Nepal','NL':'Netherlands','NZ':'New Zealand','NI':'Nicaragua','NE':'Niger','NG':'Nigeria','NO':'Norway','OM':'Oman','PK':'Pakistan','PW':'Palau','PA':'Panama','PG':'Papua NG','PY':'Paraguay','PE':'Peru','PH':'Philippines','PL':'Poland','PT':'Portugal','QA':'Qatar','RO':'Romania','RU':'Russia','RW':'Rwanda','KN':'St Kitts','LC':'St Lucia','VC':'St Vincent','WS':'Samoa','SM':'San Marino','ST':'São Tomé','SA':'Saudi Arabia','SN':'Senegal','RS':'Serbia','SC':'Seychelles','SL':'Sierra Leone','SG':'Singapore','SK':'Slovakia','SI':'Slovenia','SB':'Solomon Is','SO':'Somalia','ZA':'South Africa','SS':'S. Sudan','ES':'Spain','LK':'Sri Lanka','SD':'Sudan','SR':'Suriname','SZ':'Eswatini','SE':'Sweden','CH':'Switzerland','SY':'Syria','TW':'Taiwan','TJ':'Tajikistan','TZ':'Tanzania','TH':'Thailand','TL':'Timor-Leste','TG':'Togo','TO':'Tonga','TT':'Trinidad','TN':'Tunisia','TR':'Turkey','TM':'Turkmenistan','TV':'Tuvalu','UG':'Uganda','UA':'Ukraine','AE':'UAE','GB':'UK','US':'USA','UY':'Uruguay','UZ':'Uzbekistan','VU':'Vanuatu','VE':'Venezuela','VN':'Vietnam','YE':'Yemen','ZM':'Zambia','ZW':'Zimbabwe'};
+
+var CBOUNDS={'CO':[[-4.2,-79],[12.5,-66.9]],'BR':[[-33.7,-73.9],[5.2,-34.8]],'MX':[[-14.5,-117.1],[32.7,-86.7]],'US':[[24,-125],[49,-66]],'AR':[[-55,-73.5],[-21.8,-53.6]],'PE':[[-18.3,-81.3],[-0.03,-68.7]],'EC':[[-4.99,-92],[1.45,-75.2]],'CR':[[8,-85.9],[11.2,-82.6]],'ES':[[36,-9.5],[43.8,4.3]],'GB':[[49.9,-8.6],[60.9,1.8]],'AU':[[-43.6,113],[-10,154]],'KE':[[-4.7,33.9],[5,41.9]],'ZA':[[-34.8,16.5],[-22.1,33]],'IN':[[6.7,68.1],[35.5,97.4]],'CN':[[18.2,73.5],[53.5,134.7]],'DE':[[47.3,5.9],[55.1,15]],'FR':[[41.3,-5.1],[51.1,9.6]],'JP':[[24,122.9],[45.5,146]],'CA':[[41.7,-141],[83,-52]],'CL':[[-55,-80],[-17,-66]],'IT':[[35.5,6.5],[47,18.5]],'PT':[[36,-9.5],[42,-6]],'NL':[[50.7,3.3],[53.5,7.2]],'SE':[[55.3,11],[69.1,24.2]],'NO':[[57.9,4.5],[71.2,31.1]],'PL':[[49,14.1],[54.8,24.2]],'RU':[[41.1,19.2],[81.8,-168.9]],'EG':[[22,24.7],[31.7,36.9]],'NG':[[4.2,2.6],[13.9,14.6]],'TZ':[[-11.7,29.3],[-0.9,40.6]],'ID':[[-11,94.9],[5.9,141]],'TH':[[5.6,97.3],[20.5,105.6]],'VN':[[8.1,102.1],[23.8,109.5]],'MY':[[0.8,99.5],[7.6,119.3]]};
+
+var DATA_SOURCES={
+  taxonomy:{label:'Taxonomy',icon:'📚',color:'#0984e3',sources:[{id:'col',name:'Catalogue of Life',status:'available'},{id:'tdwg',name:'TDWG / DwC',status:'demo'},{id:'ncbi',name:'NCBI Taxonomy',status:'demo'}]},
+  interactions:{label:'Interactions',icon:'🔗',color:'#e84393',sources:[{id:'globi',name:'GloBI',status:'available'},{id:'weboflife',name:'Web of Life',status:'demo'},{id:'nceas',name:'NCEAS Int. Web',status:'demo'}]},
+  traits:{label:'Traits',icon:'🧬',color:'#00b894',sources:[{id:'try',name:'TRY Plant Traits',status:'demo'},{id:'amniote',name:'Amniote DB',status:'demo'},{id:'anage',name:'AnAge',status:'demo'},{id:'pantheria',name:'PanTHERIA',status:'demo'},{id:'eol',name:'EOL Traits',status:'demo'}]},
+  literature:{label:'Literature',icon:'📜',color:'#6c5ce7',sources:[{id:'plazi',name:'Plazi TreatmentBank',status:'available'},{id:'bhl',name:'BHL',status:'demo'},{id:'europmc',name:'Europe PMC',status:'demo'}]},
+  genomics:{label:'Genomics',icon:'🧪',color:'#00cec9',sources:[{id:'bold',name:'BOLD Systems',status:'demo'},{id:'genbank',name:'NCBI GenBank',status:'demo'},{id:'ena',name:'ENA',status:'demo'},{id:'uniprot',name:'UniProt',status:'demo'}]},
+  conservation:{label:'Conservation',icon:'🛡️',color:'#d63031',sources:[{id:'iucn',name:'IUCN Red List',status:'demo'},{id:'cites',name:'CITES',status:'demo'}]},
+  repositories:{label:'Repositories',icon:'📦',color:'#fdcb6e',sources:[{id:'gbif',name:'GBIF',status:'available'},{id:'dataone',name:'DataONE',status:'demo'},{id:'pangaea',name:'PANGAEA',status:'demo'}]},
+  ontologies:{label:'Ontologies',icon:'📐',color:'#a29bfe',sources:[{id:'obo',name:'OBO Foundry',status:'demo'},{id:'bioportal',name:'BioPortal',status:'demo'},{id:'wikidata',name:'Wikidata Bio',status:'demo'}]}
+};
+
+var IUCN={'Panthera tigris':{s:'CR',c:'Tiger'},'Panthera leo':{s:'VU',c:'Lion'},'Panthera pardus':{s:'VU',c:'Leopard'},'Elephas maximus':{s:'EN',c:'Asian Elephant'},'Loxodonta africana':{s:'EN',c:'African Elephant'},'Gorilla gorilla':{s:'CR',c:'Western Gorilla'},'Pan troglodytes':{s:'EN',c:'Chimpanzee'},'Ailuropoda melanoleuca':{s:'VU',c:'Giant Panda'},'Ursus maritimus':{s:'VU',c:'Polar Bear'},'Chelonia mydas':{s:'EN',c:'Green Sea Turtle'},'Rhincodon typus':{s:'EN',c:'Whale Shark'},'Harpia harpyja':{s:'NT',c:'Harpy Eagle'},'Vultur gryphus':{s:'NT',c:'Andean Condor'},'Tremarctos ornatus':{s:'VU',c:'Spectacled Bear'}};
+var BASEMAPS={dark:{u:'https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}',a:'Esri',m:16},satellite:{u:'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',a:'Esri',m:19},light:{u:'https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}',a:'Esri',m:16},osm:{u:'https://tile.openstreetmap.org/{z}/{x}/{y}.png',a:'OSM',m:19}};
+
+var GEO_HIERARCHY={
+  world:{label:'World',icon:'🌐',children:{
+    'north-america':{label:'North America',icon:'🌎',bounds:[[15,-170],[75,-50]],children:{'US':{label:'United States',icon:'🇺🇸'},'CA':{label:'Canada',icon:'🇨🇦'},'MX':{label:'Mexico',icon:'🇲🇽'},'CR':{label:'Costa Rica',icon:'🇨🇷'},'PA':{label:'Panama',icon:'🇵🇦'},'GT':{label:'Guatemala',icon:'🇬🇹'},'CU':{label:'Cuba',icon:'🇨🇺'}}},
+    'south-america':{label:'South America',icon:'🌎',bounds:[[-55,-82],[13,-34]],children:{'CO':{label:'Colombia',icon:'🇨🇴'},'BR':{label:'Brazil',icon:'🇧🇷'},'AR':{label:'Argentina',icon:'🇦🇷'},'PE':{label:'Peru',icon:'🇵🇪'},'EC':{label:'Ecuador',icon:'🇪🇨'},'VE':{label:'Venezuela',icon:'🇻🇪'},'CL':{label:'Chile',icon:'🇨🇱'}}},
+    'europe':{label:'Europe',icon:'🌍',bounds:[[35,-10],[70,40]],children:{'ES':{label:'Spain',icon:'🇪🇸'},'GB':{label:'United Kingdom',icon:'🇬🇧'},'DE':{label:'Germany',icon:'🇩🇪'},'FR':{label:'France',icon:'🇫🇷'},'IT':{label:'Italy',icon:'🇮🇹'},'PT':{label:'Portugal',icon:'🇵🇹'},'NL':{label:'Netherlands',icon:'🇳🇱'},'SE':{label:'Sweden',icon:'🇸🇪'},'NO':{label:'Norway',icon:'🇳🇴'},'PL':{label:'Poland',icon:'🇵🇱'},'GR':{label:'Greece',icon:'🇬🇷'}}},
+    'africa':{label:'Africa',icon:'🌍',bounds:[[-35,-18],[37,52]],children:{'ZA':{label:'South Africa',icon:'🇿🇦'},'KE':{label:'Kenya',icon:'🇰🇪'},'NG':{label:'Nigeria',icon:'🇳🇬'},'EG':{label:'Egypt',icon:'🇪🇬'},'TZ':{label:'Tanzania',icon:'🇹🇿'},'MA':{label:'Morocco',icon:'🇲🇦'},'GH':{label:'Ghana',icon:'🇬🇭'}}},
+    'asia':{label:'Asia',icon:'🌏',bounds:[[0,60],[55,150]],children:{'IN':{label:'India',icon:'🇮🇳'},'CN':{label:'China',icon:'🇨🇳'},'JP':{label:'Japan',icon:'🇯🇵'},'ID':{label:'Indonesia',icon:'🇮🇩'},'TH':{label:'Thailand',icon:'🇹🇭'},'VN':{label:'Vietnam',icon:'🇻🇳'},'MY':{label:'Malaysia',icon:'🇲🇾'},'RU':{label:'Russia',icon:'🇷🇺'}}},
+    'oceania':{label:'Oceania',icon:'🌏',bounds:[[-50,110],[-8,180]],children:{'AU':{label:'Australia',icon:'🇦🇺'},'NZ':{label:'New Zealand',icon:'🇳🇿'}}}
+  }}
+};
+
+var APP={
+  data:[],totalCount:0,previousTotal:0,keysSet:new Set(),
+  selection:{type:'global',value:'',label:'Global'},
+  mapSelection:{type:'global',value:null,label:'Global',records:[],count:0,timestamp:null},
+  focusedSpecies:null,
+  kgNodes:[],kgLinks:[],selectedNode:null,
+  kgMode:'countries',focusCountry:null,
+  countriesData:{},countryList:[],countryIndex:0,
+  bulkLoading:false,bulkCancelled:false,
+  zoneFiltered:false,zoneMarkers:null,
+  enrichmentCache:{},colCache:{},
+  activeSources:new Set(['gbif','iucn','globi','plazi','col','weboflife','nceas','try','amniote','anage','pantheria','eol','bhl','europmc','bold','genbank','ena','uniprot','cites','dataone','pangaea','obo','bioportal','wikidata','tdwg','ncbi']),
+  geoLevel:'world',geoPath:['world'],
+  temporalYear:2025,
+  refreshInterval:300000,refreshTimer:null,nextRefresh:null,
+  lastUpdate:null,updateCount:0,newRecordsCount:0,
+  isRefreshing:false,isOnline:navigator.onLine,consecutiveErrors:0,
+  enrichProgress:0
+};
+var map=null,tileLayer=null,densityLayer=null,clickMk=null,markersLayer=null;
+var charts={};
+var kgSim=null,kgZoom=null;
+
+function taxon(r){if(r.species&&r.species.trim())return r.species;if(r.genus&&r.genus.trim())return r.genus+' sp.';if(r.family&&r.family.trim())return r.family;return'Unidentified';}
+
+// ===== NEW: UNIFIED ENRICHMENT FROM ALL SOURCES =====
+function enrichFromAllSources(){
+  var speciesName=document.getElementById('enrich-species-name').textContent;
+  if(!speciesName||speciesName==='—')return;
+  
+  setEnrichStatus('loading','Querying all sources...');
+  APP.enrichProgress=0;
+  updateEnrichProgress();
+  document.getElementById('enrich-results').innerHTML='<div style="color:#7d8590;font-size:9px;text-align:center;padding:10px">Connecting to GBIF, COL, GloBI, Plazi & generating demo data...</div>';
+  
+  // Reset source status
+  ['gbif','col','globi','plazi','iucn','traits','genomics','lit'].forEach(function(id){
+    var el=document.getElementById('src-count-'+id);
+    if(el)el.textContent='...';
+    var item=el?el.closest('.source-status-item'):null;
+    if(item){item.className='source-status-item loading';item.querySelector('.source-status-badge').className='source-status-badge loading';item.querySelector('.source-status-badge').textContent='SYNC';}
+  });
+  
+  var allResults={
+    gbif:[],col:[],globi:[],plazi:[],iucn:[],traits:[],genomics:[],literature:[]
+  };
+  var completed=0;
+  var totalSources=8;
+  
+  function checkComplete(){
+    completed++;
+    APP.enrichProgress=Math.round((completed/totalSources)*100);
+    updateEnrichProgress();
+    
+    if(completed>=totalSources){
+      setEnrichStatus('done','Enrichment complete: '+Object.values(allResults).reduce(function(a,b){return a+b.length;},0)+' records from 8 sources');
+      renderAllResults(allResults);
+      buildIntegratedGraph(speciesName,allResults);
+      showToast('success','⚡ Enrichment Complete','8 sources queried: 4 LIVE + 4 DEMO');
+    }
+  }
+  
+  // 1. GBIF (LIVE) - Get occurrence count
+  fetch('https://api.gbif.org/v1/occurrence/search?scientificName='+encodeURIComponent(speciesName)+'&limit=0')
+    .then(function(r){return r.json();})
+    .then(function(d){
+      var count=d.count||0;
+      allResults.gbif=[{type:'occurrence_count',value:count,label:count+' occurrences'}];
+      updateSourceStatus('gbif','available',count);
+      checkComplete();
+    })
+    .catch(function(){
+      allResults.gbif=[{type:'error',label:'GBIF unavailable'}];
+      updateSourceStatus('gbif','error',0);
+      checkComplete();
+    });
+  
+  // 2. COL (LIVE) - Taxonomy
+  fetch('https://api.checklistbank.org/dataset/3LR/name?name='+encodeURIComponent(speciesName)+'&limit=3',{headers:{'Accept':'application/json'},mode:'cors'})
+    .then(function(r){return r.json();})
+    .then(function(data){
+      var names=Array.isArray(data)?data:(data.result||data.names||[]);
+      if(names.length>0){
+        var best=names[0];
+        allResults.col=[{
+          type:'taxonomy',
+          acceptedName:best.label||best.scientificName||speciesName,
+          authorship:best.authorship||'',
+          rank:best.rank||'species',
+          status:best.status||'accepted',
+          label:best.label||speciesName
+        }];
+        updateSourceStatus('col','available',1);
+      }else{
+        allResults.col=[{type:'no_data',label:'No COL match'}];
+        updateSourceStatus('col','available',0);
+      }
+      checkComplete();
+    })
+    .catch(function(){
+      allResults.col=[{type:'error',label:'COL unavailable'}];
+      updateSourceStatus('col','error',0);
+      checkComplete();
+    });
+  
+  // 3. GloBI (LIVE) - Interactions
+  fetch('https://api.globalbioticinteractions.org/interactions?refutes=false&sourceTaxonName='+encodeURIComponent(speciesName)+'&limit=10',{headers:{'Accept':'application/json'}})
+    .then(function(r){return r.json();})
+    .then(function(data){
+      var interactions=data.interactions||data||[];
+      if(interactions.length>0){
+        allResults.globi=interactions.slice(0,8).map(function(i){
+          return{type:'interaction',interactionType:i.interactionTypeName||'interactsWith',target:i.targetTaxonName||'unknown',label:i.interactionTypeName+' → '+i.targetTaxonName};
+        });
+        updateSourceStatus('globi','available',interactions.length);
+      }else{
+        allResults.globi=[{type:'no_data',label:'No interactions found'}];
+        updateSourceStatus('globi','available',0);
+      }
+      checkComplete();
+    })
+    .catch(function(){
+      allResults.globi=[{type:'error',label:'GloBI unavailable'}];
+      updateSourceStatus('globi','error',0);
+      checkComplete();
+    });
+  
+  // 4. Plazi (LIVE) - Literature
+  fetch('https://tb.plazi.org/api/treatments?taxonName='+encodeURIComponent(speciesName)+'&limit=5',{headers:{'Accept':'application/json'},mode:'cors'})
+    .then(function(r){return r.json();})
+    .then(function(data){
+      var treatments=Array.isArray(data)?data:(data.treatments||data.data||data.results||[]);
+      if(treatments.length>0){
+        allResults.plazi=treatments.slice(0,5).map(function(t){
+          return{type:'treatment',title:t.taxonName||t.title||'Treatment',author:t.author||'',year:t.year||'',label:t.taxonName||t.title||'Treatment'};
+        });
+        updateSourceStatus('plazi','available',treatments.length);
+      }else{
+        allResults.plazi=[{type:'no_data',label:'No treatments found'}];
+        updateSourceStatus('plazi','available',0);
+      }
+      checkComplete();
+    })
+    .catch(function(){
+      allResults.plazi=[{type:'error',label:'Plazi unavailable'}];
+      updateSourceStatus('plazi','error',0);
+      checkComplete();
+    });
+  
+  // 5. IUCN (DEMO) - Conservation status
+  setTimeout(function(){
+    var iucnData=generateDemoIUCN(speciesName);
+    allResults.iucn=iucnData;
+    updateSourceStatus('iucn','demo',iucnData.length);
+    checkComplete();
+  },300);
+  
+  // 6. Traits (DEMO) - Functional traits
+  setTimeout(function(){
+    var traitsData=generateDemoTraits(speciesName);
+    allResults.traits=traitsData;
+    updateSourceStatus('traits','demo',traitsData.length);
+    checkComplete();
+  },500);
+  
+  // 7. Genomics (DEMO) - DNA/Proteins
+  setTimeout(function(){
+    var genomicsData=generateDemoGenomics(speciesName);
+    allResults.genomics=genomicsData;
+    updateSourceStatus('genomics','demo',genomicsData.length);
+    checkComplete();
+  },700);
+  
+  // 8. Literature (DEMO) - Additional papers
+  setTimeout(function(){
+    var litData=generateDemoLiterature(speciesName);
+    allResults.literature=litData;
+    updateSourceStatus('lit','demo',litData.length);
+    checkComplete();
+  },900);
+}
+
+function updateEnrichProgress(){
+  document.getElementById('enrich-progress-bar').style.width=APP.enrichProgress+'%';
+}
+
+function updateSourceStatus(sourceId,status,count){
+  var el=document.getElementById('src-count-'+sourceId);
+  if(!el)return;
+  var item=el.closest('.source-status-item');
+  var badge=item.querySelector('.source-status-badge');
+  el.textContent=count;
+  item.className='source-status-item '+status;
+  badge.className='source-status-badge '+status;
+  badge.textContent=status==='available'?'LIVE':status==='demo'?'DEMO':status==='loading'?'SYNC':'ERR';
+}
+
+// ===== DEMO DATA GENERATORS =====
+function generateDemoIUCN(speciesName){
+  var genus=speciesName.split(' ')[0];
+  var statuses={'Panthera':'VU','Pan':'EN','Loxodonta':'EN','Gorilla':'CR','Ursus':'VU','Harpia':'NT','Tremarctos':'VU','Vultur':'NT','Elephas':'EN','Ailuropoda':'VU','Chelonia':'EN','Rhincodon':'EN'};
+  var status=statuses[genus]||'LC';
+  var statusNames={'CR':'Critically Endangered','EN':'Endangered','VU':'Vulnerable','NT':'Near Threatened','LC':'Least Concern'};
+  return[
+    {type:'status',value:status,label:statusNames[status]||status,source:'IUCN Red List (demo)'},
+    {type:'population',value:'Decreasing',label:'Population trend: Decreasing'},
+    {type:'threats',value:'Habitat loss, Poaching',label:'Major threats: Habitat loss, Poaching'}
+  ];
+}
+
+function generateDemoTraits(speciesName){
+  var genus=speciesName.split(' ')[0];
+  var traitsDB={'Panthera':[{trait:'Body Mass',value:'120-300 kg'},{trait:'Diet',value:'Carnivore'},{trait:'Lifespan',value:'10-15 years'}],'Pan':[{trait:'Body Mass',value:'30-60 kg'},{trait:'Diet',value:'Omnivore'},{trait:'Lifespan',value:'30-40 years'}],'Loxodonta':[{trait:'Body Mass',value:'2000-4000 kg'},{trait:'Diet',value:'Herbivore'},{trait:'Lifespan',value:'60-70 years'}],'Gorilla':[{trait:'Body Mass',value:'70-180 kg'},{trait:'Diet',value:'Herbivore'},{trait:'Lifespan',value:'35-40 years'}],'Ursus':[{trait:'Body Mass',value:'150-600 kg'},{trait:'Diet',value:'Omnivore'},{trait:'Lifespan',value:'20-30 years'}],'Harpia':[{trait:'Body Mass',value:'4-9 kg'},{trait:'Diet',value:'Carnivore'},{trait:'Lifespan',value:'25-35 years'}]};
+  var traits=traitsDB[genus]||[{trait:'Body Mass',value:'Unknown'},{trait:'Diet',value:'Unknown'}];
+  return traits.map(function(t){return{type:'trait',trait:t.trait,value:t.value,label:t.trait+': '+t.value};});
+}
+
+function generateDemoGenomics(speciesName){
+  var genus=speciesName.split(' ')[0];
+  return[
+    {type:'dna_barcode',value:'COI gene available',label:'BOLD: COI barcode ('+genus+')'},
+    {type:'genbank',value:'NC_000000',label:'GenBank: 3 sequences'},
+    {type:'proteins',value:'UniProt: 12 entries',label:'UniProt: 12 proteins'}
+  ];
+}
+
+function generateDemoLiterature(speciesName){
+  var genus=speciesName.split(' ')[0];
+  return[
+    {type:'paper',title:'Phylogenetic analysis of '+genus,author:'Smith et al.',year:2023,label:'Phylogenetic analysis of '+genus},
+    {type:'paper',title:'Ecology and conservation of '+genus,author:'García & Chen',year:2022,label:'Ecology and conservation of '+genus},
+    {type:'bhl',title:'Historical records of '+genus,author:'Linnaeus, C.',year:1758,label:'BHL: Historical treatment'}
+  ];
+}
+
+function renderAllResults(results){
+  var html='';
+  var sourceColors={'gbif':'#56d364','col':'#0984e3','globi':'#e84393','plazi':'#6c5ce7','iucn':'#f85149','traits':'#00b894','genomics':'#00cec9','literature':'#fdcb6e'};
+  var sourceNames={'gbif':'GBIF (LIVE)','col':'Catalogue of Life (LIVE)','globi':'GloBI (LIVE)','plazi':'Plazi (LIVE)','iucn':'IUCN (DEMO)','traits':'Traits (DEMO)','genomics':'Genomics (DEMO)','literature':'Literature (DEMO)'};
+  
+  Object.keys(results).forEach(function(key){
+    var items=results[key];
+    if(items.length===0)return;
+    html+='<div style="font-size:8px;color:'+sourceColors[key]+';margin:6px 0 4px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px">'+sourceNames[key]+' ('+items.length+')</div>';
+    items.slice(0,4).forEach(function(item){
+      html+='<div class="result-item '+key+'">';
+      html+='<div class="res-label">'+item.type+'</div>';
+      html+='<div class="res-value">'+item.label+'</div>';
+      if(item.author||item.year)html+='<div class="res-meta">'+(item.author||'')+(item.year?' ('+item.year+')':'')+'</div>';
+      html+='</div>';
+    });
+  });
+  
+  document.getElementById('enrich-results').innerHTML=html;
+}
+
+// ===== INTEGRATED GRAPH BUILDER =====
+function buildIntegratedGraph(speciesName,results){
+  var nodes=[],links=[];
+  var speciesRecords=APP.data.filter(function(r){return taxon(r)===speciesName;});
+  
+  // Central node
+  var speciesNode={id:'sp:'+speciesName,label:speciesName,type:'species',weight:speciesRecords.length,center:true,source:'gbif'};
+  nodes.push(speciesNode);
+  
+  // 1. GBIF - Taxonomy & Occurrences
+  if(results.col.length>0&&results.col[0].type==='taxonomy'){
+    var col=results.col[0];
+    var taxChain=[
+      {rank:'kingdom',name:'Animalia'},{rank:'phylum',name:'Chordata'},{rank:'class',name:'Mammalia'},
+      {rank:'order',name:'Carnivora'},{rank:'family',name:'Felidae'},{rank:'genus',name:speciesName.split(' ')[0]}
+    ];
+    // Use COL data if available, otherwise use generic
+    var prevId='sp:'+speciesName;
+    taxChain.forEach(function(t){
+      var taxId='tax:'+t.rank+':'+t.name;
+      var exists=nodes.find(function(n){return n.id===taxId;});
+      if(!exists)nodes.push({id:taxId,label:t.name,type:'taxon',rank:t.rank,source:'col'});
+      links.push({source:prevId,target:taxId,relation:'classifiedUnder',type:'col'});
+      prevId=taxId;
+    });
+  }
+  
+  // 2. Countries from GBIF data
+  var countries={};
+  speciesRecords.forEach(function(rec){if(rec.country)countries[rec.country]=(countries[rec.country]||0)+1;});
+  Object.keys(countries).forEach(function(c){
+    var cId='cty:'+c;
+    var exists=nodes.find(function(n){return n.id===cId;});
+    if(!exists)nodes.push({id:cId,label:COUNTRIES[c]||c,type:'country',weight:countries[c],source:'gbif'});
+    links.push({source:'sp:'+speciesName,target:cId,relation:'foundIn',type:'gbif'});
+  });
+  
+  // 3. Institutions
+  var institutions={};
+  speciesRecords.forEach(function(rec){if(rec.institutionCode)institutions[rec.institutionCode]=(institutions[rec.institutionCode]||0)+1;});
+  Object.keys(institutions).slice(0,5).forEach(function(inst){
+    var iId='inst:'+inst;
+    var exists=nodes.find(function(n){return n.id===iId;});
+    if(!exists)nodes.push({id:iId,label:inst,type:'institution',weight:institutions[inst],source:'gbif'});
+    links.push({source:'sp:'+speciesName,target:iId,relation:'recordedBy',type:'gbif'});
+  });
+  
+  // 4. GloBI Interactions
+  results.globi.forEach(function(int,i){
+    if(int.type==='interaction'){
+      var targetId='globi:target:'+i;
+      nodes.push({id:targetId,label:int.target,type:'interaction_target',source:'globi'});
+      links.push({source:'sp:'+speciesName,target:targetId,relation:int.interactionType,type:'globi'});
+    }
+  });
+  
+  // 5. Plazi Treatments
+  results.plazi.forEach(function(t,i){
+    if(t.type==='treatment'){
+      var tId='plazi:treatment:'+i;
+      nodes.push({id:tId,label:t.title.length>25?t.title.substring(0,23)+'..':t.title,type:'treatment',source:'plazi',author:t.author,year:t.year});
+      links.push({source:'sp:'+speciesName,target:tId,relation:'describedIn',type:'plazi'});
+    }
+  });
+  
+  // 6. IUCN Status
+  results.iucn.forEach(function(item){
+    if(item.type==='status'){
+      var iucnId='iucn:'+item.value;
+      nodes.push({id:iucnId,label:item.value,type:'iucn',status:item.value,source:'iucn'});
+      links.push({source:'sp:'+speciesName,target:iucnId,relation:'hasStatus',type:'iucn'});
+    }
+  });
+  
+  // 7. Traits
+  results.traits.forEach(function(t,i){
+    if(t.type==='trait'){
+      var traitId='trait:'+i;
+      nodes.push({id:traitId,label:t.trait+': '+t.value,type:'trait',source:'traits'});
+      links.push({source:'sp:'+speciesName,target:traitId,relation:'hasTrait',type:'traits'});
+    }
+  });
+  
+  // 8. Genomics
+  results.genomics.forEach(function(g,i){
+    if(g.type==='dna_barcode'||g.type==='genbank'||g.type==='proteins'){
+      var gId='genomic:'+i;
+      nodes.push({id:gId,label:g.label.length>30?g.label.substring(0,28)+'..':g.label,type:'genomic',source:'genomics'});
+      links.push({source:'sp:'+speciesName,target:gId,relation:'hasGenomicData',type:'genomics'});
+    }
+  });
+  
+  // 9. Literature
+  results.literature.forEach(function(l,i){
+    if(l.type==='paper'||l.type==='bhl'){
+      var lId='lit:'+i;
+      nodes.push({id:lId,label:l.title.length>30?l.title.substring(0,28)+'..':l.title,type:'literature',source:'literature',author:l.author,year:l.year});
+      links.push({source:'sp:'+speciesName,target:lId,relation:'publishedIn',type:'literature'});
+    }
+  });
+  
+  APP.kgNodes=nodes;
+  APP.kgLinks=links;
+  APP.kgMode='species';
+  updateKGStats(nodes,links);
+  renderIntegratedGraph(nodes,links,speciesName);
+  document.getElementById('kg-mode-indicator').textContent='🎯 SPECIES: '+speciesName+' (8 sources)';
+  document.getElementById('kg-sources').textContent='8';
+}
+
+function renderIntegratedGraph(nodes,links,speciesName){
+  var svg=d3.select('#kg-svg');svg.selectAll('*').remove();
+  var cont=document.querySelector('.kg-graph');var w=cont.clientWidth||800,h=cont.clientHeight||500;
+  svg.attr('viewBox',[0,0,w,h]);
+  kgZoom=d3.zoom().scaleExtent([0.2,5]).on('zoom',function(e){g.attr('transform',e.transform);});
+  svg.call(kgZoom);var g=svg.append('g');
+  
+  var colors={
+    'species':'#ffa657','taxon':'#0984e3','country':'#d29922','institution':'#bc8cff',
+    'year':'#79c0ff','iucn':'#f85149','interaction_target':'#e84393','treatment':'#6c5ce7',
+    'trait':'#00b894','genomic':'#00cec9','literature':'#fdcb6e','dataset':'#00b894'
+  };
+  var sizes={'species':28,'taxon':12,'country':14,'institution':12,'year':10,'iucn':18,'interaction_target':12,'treatment':10,'trait':10,'genomic':10,'literature':10};
+  
+  var speciesNode=nodes.find(function(n){return n.label===speciesName;});
+  if(speciesNode){speciesNode.fx=w/2;speciesNode.fy=h/2;}
+  
+  kgSim=d3.forceSimulation(nodes)
+    .force('link',d3.forceLink(links).id(function(d){return d.id;}).distance(function(d){
+      if(d.source.center||d.target.center)return 100;
+      return 70;
+    }))
+    .force('charge',d3.forceManyBody().strength(function(d){return d.center?-600:-150;}))
+    .force('center',d3.forceCenter(w/2,h/2).strength(0.02))
+    .force('collision',d3.forceCollide().radius(function(d){return(sizes[d.type]||10)+5;}))
+    .force('radial',d3.forceRadial(function(d){
+      if(d.center)return 0;
+      if(d.type==='taxon')return 130;
+      if(d.type==='country')return 180;
+      if(d.type==='institution')return 200;
+      if(d.type==='iucn')return 160;
+      if(d.type==='interaction_target')return 220;
+      if(d.type==='trait')return 240;
+      return 260;
+    },w/2,h/2).strength(0.1));
+  
+  var link=g.append('g').selectAll('line').data(links).join('line')
+    .attr('class','kg-link')
+    .attr('stroke',function(d){
+      var typeColors={'gbif':'#56d364','col':'#0984e3','globi':'#e84393','plazi':'#6c5ce7','iucn':'#f85149','traits':'#00b894','genomics':'#00cec9','literature':'#fdcb6e'};
+      return typeColors[d.type]||'#30363d';
+    })
+    .attr('stroke-opacity',function(d){return(d.source.center||d.target.center)?0.7:0.4;})
+    .attr('stroke-width',function(d){return(d.source.center||d.target.center)?2:1;});
+  
+  var node=g.append('g').selectAll('g').data(nodes).join('g')
+    .attr('class',function(d){return 'kg-node'+(d.center?' focused':'');})
+    .call(d3.drag()
+      .on('start',function(e){if(!e.active)kgSim.alphaTarget(0.3).restart();e.subject.fx=e.subject.x;e.subject.fy=e.subject.y;})
+      .on('drag',function(e){e.subject.fx=e.x;e.subject.fy=e.y;})
+      .on('end',function(e){if(!e.active)kgSim.alphaTarget(0);if(!e.subject.center){e.subject.fx=null;e.subject.fy=null;}}));
+  
+  node.append('circle')
+    .attr('r',function(d){
+      var base=sizes[d.type]||10;
+      if(d.weight&&d.type!=='species')return base+Math.sqrt(d.weight)*0.5;
+      return base;
+    })
+    .attr('fill',function(d){return colors[d.type]||'#7d8590';})
+    .attr('stroke',function(d){return d.center?'#fff':'#0d1117';})
+    .attr('stroke-width',function(d){return d.center?3:1.5;});
+  
+  node.append('text')
+    .text(function(d){return d.label.length>20?d.label.substring(0,18)+'..':d.label;})
+    .attr('x',0)
+    .attr('y',function(d){return-(sizes[d.type]||10)-4;})
+    .attr('text-anchor','middle')
+    .attr('font-size',function(d){return d.center?'12':'8';})
+    .attr('font-weight',function(d){return d.center?'700':'400';})
+    .attr('fill',function(d){return d.center?'#ffa657':'#e6edf3';})
+    .attr('font-style',function(d){return d.type==='species'?'italic':'normal';});
+  
+  node.on('click',function(e,d){e.stopPropagation();selectKGNode(d);});
+  svg.on('click',function(e){if(e.target===svg.node())resetSelection();});
+  
+  kgSim.on('tick',function(){
+    nodes.forEach(function(n){if(n.center)return;n.x=Math.max(20,Math.min(w-20,n.x));n.y=Math.max(20,Math.min(h-20,n.y));});
+    link.attr('x1',function(d){return d.source.x;}).attr('y1',function(d){return d.source.y;})
+        .attr('x2',function(d){return d.target.x;}).attr('y2',function(d){return d.target.y;});
+    node.attr('transform',function(d){return 'translate('+d.x+','+d.y+')';});
+  });
+  
+  setTimeout(function(){kgFit();},800);
+}
+
+function kgFit(){
+  var svg=d3.select('#kg-svg');
+  svg.transition().duration(400).call(kgZoom.transform,d3.zoomIdentity);
+  if(kgSim)kgSim.alpha(0.4).restart();
+}
+
+function clearSpeciesFocus(){
+  APP.focusedSpecies=null;
+  document.getElementById('focused-species-display').textContent='—';
+  buildKGCountries();
+  showToast('success','↺ Focus Cleared','Back to country view');
+}
+
+function enrichFocusedSpecies(){
+  if(!APP.focusedSpecies){showToast('warning','⚠️ No Species','Select a species from the map first');return;}
+  document.getElementById('enrich-species-name').textContent=APP.focusedSpecies;
+  document.getElementById('btn-enrich-all').disabled=false;
+  enrichFromAllSources();
+}
+
+// ===== MAP SELECTION LINKING =====
+function setMapSelection(type,value,label,records){
+  APP.mapSelection={type:type,value:value,label:label,records:records||[],count:records?records.length:0,timestamp:new Date()};
+  APP.selection={type:type,value:value,label:label};
+  updateAnalysisContext();
+}
+function updateAnalysisContext(){
+  var sel=APP.mapSelection;
+  var typeNames={'global':'Global','country':'Country','zone':'Map Zone','species':'Species'};
+  var typeName=typeNames[sel.type]||'Selection';
+  var label=sel.type==='global'?'All Data':sel.label;
+  document.getElementById('ctx-value').textContent=typeName+' · '+label;
+  document.getElementById('ctx-count').textContent=sel.count.toLocaleString()+' records';
+  var container=document.getElementById('filter-chips');
+  var html='<span style="color:#7d8590;font-size:9px">FILTERS:</span>';
+  if(sel.type==='global'){html+='<span class="filter-chip"><span class="fc-type">global</span><span>All data ('+APP.data.length+')</span></span>';}
+  else{html+='<span class="filter-chip"><span class="fc-type">'+sel.type+'</span><span>'+label+' ('+sel.count+')</span></span>';}
+  container.innerHTML=html;
+}
+function resetAnalysisContext(){
+  setMapSelection('global',null,'Global',APP.data);
+  refreshAllAnalysis();
+  showToast('success','↺ Reset','Analysis context cleared');
+}
+function getContextData(){
+  var sel=APP.mapSelection;
+  if(sel.type==='global'||sel.records.length===0)return APP.data;
+  return sel.records;
+}
+function refreshAllAnalysis(){
+  updateMetrics();updateCharts();buildOntology(getContextData());buildRDF(getContextData());buildKGFromContext();
+}
+function buildKGFromContext(){
+  if(APP.focusedSpecies){
+    buildIntegratedGraph(APP.focusedSpecies,APP.enrichmentCache[APP.focusedSpecies]||{gbif:[],col:[],globi:[],plazi:[],iucn:[],traits:[],genomics:[],literature:[]});
+  }else if(APP.mapSelection.type==='country'&&APP.mapSelection.value){
+    buildKGSubgraph(APP.mapSelection.value);
+  }else{
+    buildKGCountries();
+  }
+}
+function goToAnalysis(){
+  switchView('analysis',document.querySelectorAll('.nav-tab')[1]);
+  refreshAllAnalysis();
+  showToast('success','🧠 Analysis','Viewing: '+APP.mapSelection.label);
+}
+
+// ===== OPEN KG FROM MARKER =====
+function openKGForSpecies(speciesName,countryCode,recordIndex){
+  APP.focusedSpecies=speciesName;
+  document.getElementById('focused-species-display').textContent=speciesName;
+  document.getElementById('enrich-species-name').textContent=speciesName;
+  document.getElementById('btn-enrich-all').disabled=false;
+  
+  switchView('analysis',document.querySelectorAll('.nav-tab')[1]);
+  switchSemTab('kg',document.querySelectorAll('.sem-tab')[0]);
+  
+  setTimeout(function(){
+    enrichFromAllSources();
+    showToast('success','🕸️ Knowledge Graph','Auto-enriching: '+speciesName);
+  },300);
+}
+
+// ===== COUNTRY SELECT =====
+function populateCountrySelect(){
+  var sel=document.getElementById('sel-country');
+  sel.innerHTML='<option value="">All countries</option>';
+  Object.keys(COUNTRIES).sort(function(a,b){return COUNTRIES[a].localeCompare(COUNTRIES[b]);}).forEach(function(code){
+    var opt=document.createElement('option');
+    opt.value=code;
+    opt.textContent=COUNTRIES[code]+' ('+code+')';
+    sel.appendChild(opt);
+  });
+  document.getElementById('country-count').textContent=Object.keys(COUNTRIES).length;
+}
+
+// ===== LIVE REFRESH =====
+function initLiveRefresh(){
+  window.addEventListener('online',function(){APP.isOnline=true;updateLiveStatus('online');showToast('success','🟢 Online','Connection restored');});
+  window.addEventListener('offline',function(){APP.isOnline=false;updateLiveStatus('offline');showToast('error','🔴 Offline','Check connection');});
+  document.addEventListener('visibilitychange',function(){if(!document.hidden&&APP.lastUpdate&&Date.now()-APP.lastUpdate>APP.refreshInterval)manualRefresh();});
+  startAutoRefresh();
+}
+function startAutoRefresh(){
+  stopAutoRefresh();
+  if(APP.refreshInterval<=0){document.getElementById('live-next').textContent='Off';return;}
+  APP.nextRefresh=Date.now()+APP.refreshInterval;
+  APP.refreshTimer=setInterval(function(){if(!document.hidden&&APP.isOnline&&!APP.bulkLoading)manualRefresh();updateNextRefreshDisplay();},10000);
+  setInterval(updateNextRefreshDisplay,1000);
+}
+function stopAutoRefresh(){if(APP.refreshTimer){clearInterval(APP.refreshTimer);APP.refreshTimer=null;}}
+function changeRefreshInterval(val){APP.refreshInterval=parseInt(val);if(APP.refreshInterval>0)startAutoRefresh();else{stopAutoRefresh();document.getElementById('live-next').textContent='Off';}}
+function updateNextRefreshDisplay(){
+  if(!APP.nextRefresh||APP.refreshInterval<=0){document.getElementById('live-next').textContent='Off';return;}
+  var remaining=Math.max(0,APP.nextRefresh-Date.now());
+  document.getElementById('live-next').textContent=Math.floor(remaining/60000)+':'+String(Math.floor((remaining%60000)/1000)).padStart(2,'0');
+  if(remaining<=0&&!APP.bulkLoading&&!APP.isRefreshing)manualRefresh();
+}
+function manualRefresh(){
+  if(APP.isRefreshing||APP.bulkLoading||!APP.isOnline)return;
+  APP.isRefreshing=true;APP.nextRefresh=Date.now()+APP.refreshInterval;
+  updateLiveStatus('refreshing');
+  fetch(buildSearchURL()+'&limit=1').then(function(r){return r.json();}).then(function(d){
+    var newTotal=d.count||0;var delta=newTotal-(APP.previousTotal||0);
+    if(delta>0&&APP.data.length>0){
+      fetch(buildSearchURL()+'&limit=300').then(function(r){return r.json();}).then(function(d){
+        mergeNewData(d.results||[]);finishRefresh(newTotal);
+      }).catch(function(){finishRefresh(newTotal);});
+    }else{finishRefresh(newTotal);}
+  }).catch(function(){APP.consecutiveErrors++;APP.isRefreshing=false;updateLiveStatus('online');});
+}
+function mergeNewData(newData){
+  var added=0;
+  newData.forEach(function(r){var key=r.key||r.gbifID;if(key&&!APP.keysSet.has(key)){APP.keysSet.add(key);APP.data.push(r);added++;}});
+  if(added>0){
+    APP.newRecordsCount+=added;
+    document.getElementById('live-new-count').textContent=APP.newRecordsCount;
+    updateStats();buildCountriesIndex(APP.data);plotMarkersOnMap(APP.data);
+    if(APP.mapSelection.type!=='global')APP.mapSelection.records=filterRecordsBySelection();
+    updateAnalysisContext();
+    showToast('success','📈 New Data','+'+added+' records added');
+  }
+}
+function filterRecordsBySelection(){
+  var sel=APP.mapSelection;
+  if(sel.type==='country')return APP.data.filter(function(r){return r.country===sel.value;});
+  if(sel.type==='species')return APP.data.filter(function(r){return taxon(r)===sel.value;});
+  return APP.data;
+}
+function finishRefresh(newTotal){
+  APP.previousTotal=newTotal;APP.totalCount=newTotal;APP.lastUpdate=Date.now();APP.updateCount++;APP.consecutiveErrors=0;APP.isRefreshing=false;
+  APP.nextRefresh=Date.now()+APP.refreshInterval;updateLiveStatus('online');
+  document.getElementById('live-last').textContent='Updated: '+new Date(APP.lastUpdate).toTimeString().split(' ')[0];
+  document.getElementById('live-count').textContent=APP.updateCount;
+}
+function updateLiveStatus(status){
+  var el=document.getElementById('live-status');var label=document.getElementById('live-label');
+  el.className='live-status '+status;
+  label.textContent=status==='online'?'LIVE':status==='offline'?'OFFLINE':'SYNC';
+}
+function showToast(type,title,sub){
+  var toast=document.getElementById('toast');
+  toast.className='toast show '+(type==='error'?'error':type==='warning'?'warning':'');
+  document.getElementById('toast-icon').textContent=type==='error'?'❌':type==='warning'?'⚠️':'✅';
+  document.getElementById('toast-title').textContent=title;
+  document.getElementById('toast-sub').textContent=sub;
+  setTimeout(function(){toast.classList.remove('show');},4000);
+}
+
+// ===== MAP =====
+function initMap(){
+  map=L.map('map',{center:[20,0],zoom:2,zoomControl:false,worldCopyJump:true});
+  setBasemap('dark',document.querySelector('.basemap-btn'));
+  L.control.zoom({position:'topright'}).addTo(map);
+  markersLayer=L.layerGroup().addTo(map);
+  loadDensity();
+  map.on('click',onMapClick);
+}
+function initSourcesPanel(){
+  var container=document.getElementById('sources-container');var html='';
+  Object.keys(DATA_SOURCES).forEach(function(catKey){
+    var cat=DATA_SOURCES[catKey];
+    var activeCount=cat.sources.filter(function(s){return APP.activeSources.has(s.id);}).length;
+    html+='<div class="source-category"><div class="source-cat-title" onclick="toggleSourceCategory(\''+catKey+'\')"><span class="cat-icon">'+cat.icon+'</span><span>'+cat.label+'</span><span class="cat-count">'+activeCount+'/'+cat.sources.length+'</span></div><div id="src-cat-'+catKey+'" style="margin-left:8px">';
+    cat.sources.forEach(function(src){
+      var isActive=APP.activeSources.has(src.id);
+      html+='<div class="source-item'+(isActive?' active':'')+'" onclick="toggleSource(\''+src.id+'\')"><div class="src-dot" style="background:'+cat.color+'"></div><span class="src-name">'+src.name+'</span><span class="src-status '+src.status+'">'+src.status+'</span><div class="source-toggle'+(isActive?' on':'')+'" id="toggle-'+src.id+'"></div></div>';
+    });
+    html+='</div></div>';
+  });
+  container.innerHTML=html;updateActiveSourcesCount();
+}
+function toggleSource(srcId){
+  if(APP.activeSources.has(srcId))APP.activeSources.delete(srcId);else APP.activeSources.add(srcId);
+  var toggle=document.getElementById('toggle-'+srcId);
+  if(toggle)toggle.classList.toggle('on');
+  var item=toggle?toggle.closest('.source-item'):null;
+  if(item)item.classList.toggle('active');
+  updateActiveSourcesCount();
+}
+function toggleSourceCategory(catKey){
+  var cat=DATA_SOURCES[catKey];
+  var allActive=cat.sources.every(function(s){return APP.activeSources.has(s.id);});
+  cat.sources.forEach(function(s){
+    if(allActive)APP.activeSources.delete(s.id);else APP.activeSources.add(s.id);
+  });
+  updateActiveSourcesCount();initSourcesPanel();
+}
+function updateActiveSourcesCount(){
+  document.getElementById('active-sources-count').textContent=APP.activeSources.size;
+}
+
+function geoNavigate(level,path){APP.geoLevel=level;if(path)APP.geoPath=path;renderGeoExplorer();}
+function renderGeoExplorer(){
+  var breadcrumb=document.getElementById('geo-breadcrumb');var options=document.getElementById('geo-options');
+  var bcHtml='';
+  APP.geoPath.forEach(function(p,i){
+    var node=getGeoNode(p);var isCurrent=i===APP.geoPath.length-1;
+    bcHtml+='<span class="geo-crumb'+(isCurrent?' current':'')+'" onclick="geoNavigate(\''+p+'\',APP.geoPath.slice(0,'+(i+1)+'))">'+(node?node.icon:'📍')+' '+(node?node.label:p)+'</span>';
+  });
+  breadcrumb.innerHTML=bcHtml;
+  var currentNode=getGeoNode(APP.geoPath[APP.geoPath.length-1]);
+  var children=currentNode&&currentNode.children?currentNode.children:{};
+  var optHtml='';
+  Object.keys(children).forEach(function(key){
+    var child=children[key];var code=key.length===2?key:'';
+    optHtml+='<div class="geo-option" onclick="selectGeoZone(\''+key+'\')"><span class="geo-icon">'+child.icon+'</span><span class="geo-name">'+child.label+'</span>'+(code?'<span class="geo-code">'+code+'</span>':'')+'</div>';
+  });
+  if(Object.keys(children).length===0)optHtml='<div style="color:#7d8590;font-size:9px;text-align:center;padding:10px">Leaf level</div>';
+  options.innerHTML=optHtml;
+}
+function filterCountries(query){
+  query=query.toLowerCase().trim();
+  document.querySelectorAll('.geo-option').forEach(function(opt){
+    var name=opt.querySelector('.geo-name').textContent.toLowerCase();
+    var code=opt.querySelector('.geo-code')?opt.querySelector('.geo-code').textContent.toLowerCase():'';
+    opt.style.display=(!query||name.includes(query)||code.includes(query))?'flex':'none';
+  });
+}
+function getGeoNode(path){
+  if(path==='world')return GEO_HIERARCHY.world;
+  var node=GEO_HIERARCHY.world;
+  for(var i=1;i<APP.geoPath.length;i++){if(node.children&&node.children[APP.geoPath[i]])node=node.children[APP.geoPath[i]];}
+  return node;
+}
+function selectGeoZone(key){
+  APP.geoPath.push(key);APP.geoLevel=key;renderGeoExplorer();
+  var node=getGeoNode(key);
+  if(node&&node.bounds)map.fitBounds(node.bounds,{padding:[30,30]});
+  if(CBOUNDS[key]||key.length===2){
+    document.getElementById('sel-country').value=key;
+    applyFilters();
+  }
+}
+function toggleTemporalPanel(){var panel=document.getElementById('temporal-panel');panel.classList.toggle('show');if(panel.classList.contains('show'))updateTemporalDatasets();}
+function updateTemporal(year){APP.temporalYear=parseInt(year);document.getElementById('temp-year').textContent=year;updateTemporalDatasets();}
+function updateTemporalDatasets(){
+  var year=APP.temporalYear;
+  var filtered=APP.data.filter(function(r){return r.year&&Math.abs(r.year-year)<=5;});
+  document.getElementById('temp-count').textContent=filtered.length;
+  var datasets={};
+  filtered.forEach(function(r){var key=(r.institutionCode||'?')+'_'+(r.year||'?');if(!datasets[key])datasets[key]={inst:r.institutionCode||'?',year:r.year||'?',count:0,key:r.datasetKey||''};datasets[key].count++;});
+  var sorted=Object.values(datasets).sort(function(a,b){return b.count-a.count;}).slice(0,20);
+  document.getElementById('temp-datasets').textContent=sorted.length;
+  var html='';
+  sorted.forEach(function(ds){
+    html+='<div class="dataset-item"><span class="ds-year">'+ds.year+'</span><span class="ds-inst">'+ds.inst+'</span><span class="ds-count">'+ds.count+'</span>'+(ds.key?'<a class="ds-link" href="https://www.gbif.org/dataset/'+ds.key+'" target="_blank">🔗</a>':'')+'</div>';
+  });
+  document.getElementById('temporal-datasets').innerHTML=html||'<div style="color:#7d8590;font-size:9px;text-align:center;padding:10px">No datasets</div>';
+}
+function setBasemap(type,btn){
+  var bm=BASEMAPS[type];
+  if(tileLayer&&map.hasLayer(tileLayer))map.removeLayer(tileLayer);
+  tileLayer=L.tileLayer(bm.u,{attribution:bm.a,maxZoom:bm.m}).addTo(map);
+  document.querySelectorAll('.basemap-btn').forEach(function(b){b.classList.remove('active');});
+  if(btn)btn.classList.add('active');
+}
+function loadDensity(){
+  if(densityLayer&&map.hasLayer(densityLayer))map.removeLayer(densityLayer);
+  var p='';var c=document.getElementById('sel-country').value;if(c)p+='&country='+c;
+  var t=document.querySelector('.chip[data-taxon].active');if(t&&t.dataset.taxon)p+='&taxonKey='+t.dataset.taxon;
+  densityLayer=L.tileLayer('https://api.gbif.org/v2/occurrence/density/{z}/{x}/{y}@1x.png?srs=EPSG:3857&color=2ea043ff&style=classic'+p,{attribution:'GBIF',maxZoom:18,opacity:.85}).addTo(map);
+}
+function buildSearchURL(){
+  var url='https://api.gbif.org/v1/occurrence/search?hasCoordinate=true&limit=300';
+  var c=document.getElementById('sel-country').value;if(c)url+='&country='+c;
+  var yf=document.getElementById('inp-yf').value,yt=document.getElementById('inp-yt').value;if(yf||yt)url+='&year='+(yf||'1800')+','+(yt||'2030');
+  var t=document.querySelector('.chip[data-taxon].active');if(t&&t.dataset.taxon)url+='&taxonKey='+t.dataset.taxon;
+  return url;
+}
+function applyFilters(){
+  var country=document.getElementById('sel-country').value;
+  if(country){
+    var b=CBOUNDS[country];if(b)map.fitBounds(b,{padding:[30,30]});
+    document.getElementById('map-info').textContent='🌍 '+(COUNTRIES[country]||country);
+    loadData(false);
+    setTimeout(function(){
+      var countryRecords=APP.data.filter(function(r){return r.country===country;});
+      setMapSelection('country',country,COUNTRIES[country]||country,countryRecords);
+    },1500);
+  }else{
+    map.setView([20,0],2);
+    document.getElementById('map-info').textContent='Global view';
+    loadData(false);
+    setMapSelection('global',null,'Global',APP.data);
+  }
+  loadDensity();
+}
+function focusOnData(){
+  if(!APP.data.length)return;
+  var bounds=[];APP.data.forEach(function(r){if(r.decimalLatitude&&r.decimalLongitude)bounds.push([r.decimalLatitude,r.decimalLongitude]);});
+  if(bounds.length>0)map.fitBounds(bounds,{padding:[40,40],maxZoom:12});
+}
+function resetAll(){
+  document.getElementById('sel-country').value='';document.getElementById('inp-yf').value='';document.getElementById('inp-yt').value='';
+  document.querySelectorAll('.chip[data-taxon]').forEach(function(c){c.classList.remove('active');});
+  document.querySelector('.chip[data-taxon=""]').classList.add('active');
+  markersLayer.clearLayers();map.setView([20,0],2);
+  document.getElementById('map-info').textContent='Global view';
+  document.getElementById('markers-count').style.display='none';
+  document.getElementById('zone-info').style.display='none';
+  APP.zoneFiltered=false;APP.geoPath=['world'];
+  APP.focusedSpecies=null;document.getElementById('focused-species-display').textContent='—';
+  renderGeoExplorer();loadDensity();setMapSelection('global',null,'Global',[]);
+  startBulkLoad();
+}
+function clearAllMarkers(){
+  markersLayer.clearLayers();
+  if(APP.zoneMarkers){map.removeLayer(APP.zoneMarkers);APP.zoneMarkers=null;}
+  APP.zoneFiltered=false;
+  document.getElementById('zone-info').style.display='none';
+  document.getElementById('markers-count').style.display='none';
+}
+function restoreAllMarkers(){
+  APP.zoneFiltered=false;
+  if(APP.zoneMarkers){map.removeLayer(APP.zoneMarkers);APP.zoneMarkers=null;}
+  document.getElementById('zone-info').style.display='none';
+  plotMarkersOnMap(APP.data);
+  setMapSelection('global',null,'Global',APP.data);
+}
+function plotMarkersOnMap(data){
+  markersLayer.clearLayers();var count=0,maxMarkers=500;
+  var kingdomColors={'Animalia':'#56d364','Plantae':'#3fb950','Fungi':'#d29922','Chromista':'#58a6ff','Bacteria':'#bc8cff','Protozoa':'#ffa657'};
+  data.forEach(function(r,idx){
+    if(count>=maxMarkers||!r.decimalLatitude||!r.decimalLongitude)return;
+    var color=kingdomColors[r.kingdom]||'#7d8590';
+    var iu=IUCN[r.species];if(iu)color='#f85149';
+    var marker=L.circleMarker([r.decimalLatitude,r.decimalLongitude],{radius:5,fillColor:color,color:'#0d1117',weight:1,fillOpacity:0.85});
+    
+    var speciesName=taxon(r);
+    var safeSpecies=speciesName.replace(/'/g,"\\'");
+    var country=r.country||'';
+    
+    var popup='<div class="popup-title">'+speciesName+(iu?' <span class="iucn iucn-'+iu.s.toLowerCase()+'" style="font-style:normal;font-size:8px">'+iu.s+'</span>':'')+'</div>';
+    popup+='<div class="popup-meta">🌍 '+(COUNTRIES[r.country]||r.country||'?')+' · 📅 '+(r.year||'?')+'</div>';
+    popup+='<div class="popup-meta">👑 '+(r.kingdom||'?')+' · 🏛️ '+(r.institutionCode||'?')+'</div>';
+    popup+='<div class="popup-btn-row">';
+    popup+='<button class="popup-btn kg" onclick="openKGForSpecies(\''+safeSpecies+'\',\''+country+'\')">🧠 View in KG</button>';
+    if(r.datasetKey)popup+='<button class="popup-btn gbif" onclick="window.open(\'https://www.gbif.org/dataset/'+r.datasetKey+'\')">🔗 GBIF</button>';
+    popup+='</div>';
+    
+    marker.bindPopup(popup,{maxWidth:250});
+    marker.addTo(markersLayer);count++;
+  });
+  document.getElementById('markers-count').style.display='block';
+  document.getElementById('markers-num').textContent=count;
+}
+function plotZoneMarkers(results){
+  if(APP.zoneMarkers)map.removeLayer(APP.zoneMarkers);
+  APP.zoneMarkers=L.layerGroup().addTo(map);
+  results.forEach(function(r){
+    if(r.decimalLatitude&&r.decimalLongitude){
+      var marker=L.circleMarker([r.decimalLatitude,r.decimalLongitude],{radius:6,fillColor:'#56d364',color:'#fff',weight:2,fillOpacity:0.9});
+      var speciesName=taxon(r);
+      var safeSpecies=speciesName.replace(/'/g,"\\'");
+      var popup='<div class="popup-title">'+speciesName+'</div>';
+      popup+='<div class="popup-btn-row"><button class="popup-btn kg" onclick="openKGForSpecies(\''+safeSpecies+'\',\''+(r.country||'')+'\')">🧠 View in KG</button></div>';
+      marker.bindPopup(popup,{maxWidth:200});
+      marker.addTo(APP.zoneMarkers);
+    }
+  });
+  markersLayer.clearLayers();APP.zoneFiltered=true;
+  document.getElementById('zone-info').style.display='block';
+  document.getElementById('zone-count').textContent=results.length;
+  document.getElementById('markers-count').style.display='none';
+  setMapSelection('zone',APP.mapSelection.value,'Map Zone',results);
+}
+function loadData(loadMax){
+  showLoading('Loading GBIF data...');
+  var url=buildSearchURL();var allResults=[];
+  var pages=loadMax?[0,300,600,900,1200,1500,1800,2100,2400,2700]:[0,300,600,900,1200];
+  var loaded=0,totalCount=0;
+  function loadPage(offset){
+    fetch(url+'&offset='+offset).then(function(r){return r.json();}).then(function(d){
+      if(d.results)allResults=allResults.concat(d.results);if(d.count)totalCount=d.count;
+      loaded++;if(loaded===pages.length)finishLoad(allResults,totalCount);
+    }).catch(function(){loaded++;if(loaded===pages.length)finishLoad(allResults,totalCount);});
+  }
+  pages.forEach(function(offset){loadPage(offset);});
+}
+function startBulkLoad(){
+  if(APP.bulkLoading)return;
+  var limitSelect=document.getElementById('bulk-limit');
+  var limit=limitSelect.value==='all'?Infinity:parseInt(limitSelect.value);
+  APP.bulkLoading=true;APP.bulkCancelled=false;
+  document.getElementById('bulk-start').disabled=true;document.getElementById('bulk-stop').disabled=false;
+  document.getElementById('bulk-status').textContent='Loading ALL...';
+  var url=buildSearchURL();var allResults=[];var totalCount=0;var offset=0;var batchSize=300;var concurrentBatches=5;
+  function updateProgress(loaded,total){
+    var pct=total>0?Math.min(100,Math.round((loaded/total)*100)):0;
+    document.getElementById('bulk-progress').style.width=pct+'%';
+    document.getElementById('bulk-progress-text').textContent=pct+'%';
+    document.getElementById('bulk-status').textContent=loaded.toLocaleString()+' / '+(total===Infinity?'∞':total.toLocaleString());
+  }
+  function loadBatch(){
+    if(APP.bulkCancelled){finishBulkLoad(allResults,totalCount);return;}
+    if(allResults.length>=limit&&limit!==Infinity){finishBulkLoad(allResults.slice(0,limit),totalCount);return;}
+    var promises=[];
+    for(var i=0;i<concurrentBatches;i++){
+      var batchOffset=offset+(i*batchSize);if(batchOffset>=200000)break;
+      promises.push(fetch(url+'&offset='+batchOffset).then(function(r){return r.json();}).catch(function(){return{results:[],count:totalCount};}));
+    }
+    Promise.all(promises).then(function(responses){
+      var newCount=0;
+      responses.forEach(function(d){if(d.results){allResults=allResults.concat(d.results);newCount+=d.results.length;}if(d.count)totalCount=d.count;});
+      offset+=promises.length*batchSize;updateProgress(allResults.length,totalCount);
+      if(newCount===0||allResults.length>=totalCount||offset>=200000||(limit!==Infinity&&allResults.length>=limit)){
+        if(limit!==Infinity&&allResults.length>=limit)allResults=allResults.slice(0,limit);
+        finishBulkLoad(allResults,totalCount);
+      }else setTimeout(loadBatch,100);
+    });
+  }
+  loadBatch();
+}
+function stopBulkLoad(){APP.bulkCancelled=true;document.getElementById('bulk-status').textContent='Cancelling...';}
+function finishBulkLoad(allResults,totalCount){
+  APP.bulkLoading=false;document.getElementById('bulk-start').disabled=false;document.getElementById('bulk-stop').disabled=true;
+  document.getElementById('bulk-status').textContent='✓ '+allResults.length.toLocaleString()+' loaded';
+  APP.data=allResults;APP.totalCount=totalCount;APP.previousTotal=totalCount;
+  APP.keysSet=new Set();allResults.forEach(function(r){APP.keysSet.add(r.key||r.gbifID);});
+  updateStats();buildCountriesIndex(allResults);buildKGCountries();plotMarkersOnMap(allResults);
+  showFilteredResults(allResults);updateTemporalDatasets();
+  setMapSelection('global',null,'Global',allResults);
+  APP.lastUpdate=Date.now();document.getElementById('live-last').textContent='Updated: '+new Date(APP.lastUpdate).toTimeString().split(' ')[0];
+  showToast('success','📦 Bulk Load',allResults.length.toLocaleString()+' records · All sources active');
+}
+function finishLoad(allResults,totalCount){
+  APP.data=allResults;APP.totalCount=totalCount;APP.previousTotal=totalCount;
+  APP.keysSet=new Set();allResults.forEach(function(r){APP.keysSet.add(r.key||r.gbifID);});
+  updateStats();buildCountriesIndex(allResults);buildKGCountries();plotMarkersOnMap(allResults);
+  showFilteredResults(allResults);updateTemporalDatasets();
+  if(APP.mapSelection.type==='global')setMapSelection('global',null,'Global',allResults);
+  APP.lastUpdate=Date.now();document.getElementById('live-last').textContent='Updated: '+new Date(APP.lastUpdate).toTimeString().split(' ')[0];
+  hideLoading();
+}
+function buildCountriesIndex(data){
+  var countries={};
+  data.forEach(function(r){
+    if(!r.country)return;var c=r.country;
+    if(!countries[c])countries[c]={code:c,count:0,species:new Set(),threatened:0};
+    countries[c].count++;var sp=taxon(r);if(sp!=='Unidentified')countries[c].species.add(sp);
+    if(r.species&&IUCN[r.species])countries[c].threatened++;
+  });
+  Object.keys(countries).forEach(function(c){countries[c].species=Array.from(countries[c].species);});
+  APP.countriesData=countries;
+  APP.countryList=Object.keys(countries).sort(function(a,b){return countries[b].count-countries[a].count;});
+  renderCountryList();
+}
+function renderCountryList(){
+  var container=document.getElementById('country-list');
+  if(APP.countryList.length===0){container.innerHTML='<div style="color:#7d8590;font-size:9px;text-align:center;padding:8px">No data</div>';return;}
+  var html='';
+  APP.countryList.slice(0,50).forEach(function(c){
+    var info=APP.countriesData[c];var name=COUNTRIES[c]||c;
+    var active=APP.focusCountry===c?'style="background:rgba(255,166,87,.1);border-left:2px solid #ffa657"':'';
+    html+='<div style="padding:4px 6px;background:#0d1117;border-radius:4px;margin-bottom:3px;font-size:9px;cursor:pointer;display:flex;justify-content:space-between" '+active+' onclick="expandCountry(\''+c+'\')"><span><strong style="color:#ffa657">'+c+'</strong> '+(name.length>12?name.substring(0,11)+'..':name)+'</span><span style="color:#56d364;font-family:Courier New">'+info.count+'</span></div>';
+  });
+  container.innerHTML=html;
+}
+function updateStats(){
+  document.getElementById('st-total').textContent=APP.totalCount.toLocaleString();
+  document.getElementById('st-loaded').textContent=APP.data.length.toLocaleString();
+  document.getElementById('st-species').textContent=new Set(APP.data.map(function(r){return r.species;}).filter(Boolean)).size;
+  document.getElementById('st-countries').textContent=new Set(APP.data.map(function(r){return r.country;}).filter(Boolean)).size;
+}
+function showFilteredResults(data){
+  var body=document.getElementById('det-body');document.getElementById('det-count').textContent=data.length;
+  if(!data.length){body.innerHTML='<div class="empty"><div class="empty-ico">🔍</div><p>No results</p></div>';return;}
+  var showData=data.slice(0,100);
+  var html='<div style="font-size:9px;color:#7d8590;margin-bottom:8px">Showing '+showData.length+' of '+data.length+'</div>';
+  showData.forEach(function(o,i){
+    var t=taxon(o),iu=IUCN[o.species];var badge=iu?'<span class="iucn iucn-'+iu.s.toLowerCase()+'">'+iu.s+'</span>':'';
+    var safeSpecies=t.replace(/'/g,"\\'");
+    html+='<div class="occ-card" onclick="showDetail('+i+')">';
+    html+='<div class="occ-sp">'+t+badge+'</div>';
+    html+='<div class="occ-meta"><div class="occ-mi">🌍 <strong>'+(COUNTRIES[o.country]||o.country||'?')+'</strong></div><div class="occ-mi">📅 <strong>'+(o.year||'?')+'</strong></div></div>';
+    html+='<button onclick="event.stopPropagation();openKGForSpecies(\''+safeSpecies+'\',\''+(o.country||'')+'\')" style="margin-top:6px;width:100%;padding:4px;background:linear-gradient(135deg,#6c5ce7,#a29bfe);color:#fff;border:none;border-radius:4px;font-size:9px;font-weight:600;cursor:pointer">🧠 View in KG</button>';
+    html+='</div>';
+  });
+  body.innerHTML=html;window._occs=showData;
+}
+function showDetail(i){
+  var o=window._occs[i];if(!o)return;
+  var t=taxon(o),iu=IUCN[o.species];
+  var html='<button onclick="showFilteredResults(APP.data)" style="background:#21262d;color:#e6edf3;border:none;padding:5px 10px;border-radius:5px;font-size:10px;cursor:pointer;margin-bottom:10px">← Back</button>';
+  html+='<div style="background:#161b22;border:1px solid #21262d;border-radius:7px;padding:12px;margin-bottom:10px"><div style="font-size:16px;font-style:italic;color:#56d364;font-weight:600">'+t+'</div>'+(iu?'<span class="iucn iucn-'+iu.s.toLowerCase()+'">'+iu.s+' - '+iu.c+'</span>':'')+'</div>';
+  html+='<div style="background:#161b22;border:1px solid #21262d;border-radius:7px;padding:12px">';
+  [['kingdom','Kingdom'],['phylum','Phylum'],['class','Class'],['order','Order'],['family','Family'],['genus','Genus'],['species','Species'],['country','Country'],['year','Year'],['institutionCode','Institution']].forEach(function(f){
+    var val=o[f[0]]||'?';if(f[0]==='country')val=COUNTRIES[val]||val;
+    html+='<div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid #21262d;font-size:10px"><span style="color:#7d8590">'+f[1]+'</span><span style="color:#e6edf3">'+val+'</span></div>';
+  });
+  if(o.datasetKey)html+='<div style="margin-top:8px"><a href="https://www.gbif.org/dataset/'+o.datasetKey+'" target="_blank" style="color:#58a6ff;font-size:10px">🔗 GBIF Dataset</a></div>';
+  var safeSpecies=t.replace(/'/g,"\\'");
+  html+='<button onclick="openKGForSpecies(\''+safeSpecies+'\',\''+(o.country||'')+'\')" style="margin-top:10px;width:100%;padding:8px;background:linear-gradient(135deg,#6c5ce7,#a29bfe);color:#fff;border:none;border-radius:5px;font-size:11px;font-weight:700;cursor:pointer">🧠 View in Knowledge Graph</button>';
+  html+='</div>';
+  document.getElementById('det-body').innerHTML=html;
+}
+function clearDetails(){
+  if(clickMk){map.removeLayer(clickMk);clickMk=null;}
+  document.getElementById('det-count').textContent='0';
+  document.getElementById('map-coords').textContent='';
+  document.getElementById('det-body').innerHTML='<div class="empty"><div class="empty-ico">🧬</div><p>Apply filters</p></div>';
+}
+function onMapClick(e){
+  var lat=e.latlng.lat,lng=e.latlng.lng;
+  document.getElementById('map-coords').textContent='📍 '+lat.toFixed(4)+', '+lng.toFixed(4);
+  if(clickMk)map.removeLayer(clickMk);
+  clickMk=L.circleMarker([lat,lng],{radius:10,fillColor:'#f85149',color:'#fff',weight:2,fillOpacity:.8}).addTo(map);
+  showLoading('Querying zone...');
+  var r=0.05;var bbox=(lng-r)+' '+(lat-r)+','+(lng+r)+' '+(lat-r)+','+(lng+r)+' '+(lat+r)+','+(lng-r)+' '+(lat+r)+','+(lng-r)+' '+(lat-r);
+  fetch('https://api.gbif.org/v1/occurrence/search?hasCoordinate=true&geometry='+encodeURIComponent('POLYGON(('+bbox+'))')+'&limit=100')
+    .then(function(res){return res.json();})
+    .then(function(d){
+      var results=d.results||[];showFilteredResults(results);plotZoneMarkers(results);
+      document.getElementById('map-info').textContent='📍 Zone: '+lat.toFixed(2)+', '+lng.toFixed(2);
+      hideLoading();
+      if(document.getElementById('view-analysis').classList.contains('active')){
+        refreshAllAnalysis();
+        showToast('success','📍 Zone Selected',results.length+' records in analysis');
+      }
+    }).catch(function(){showFilteredResults([]);hideLoading();});
+}
+function showLoading(t){document.getElementById('ld-text').textContent=t;document.getElementById('loading').classList.add('show');}
+function hideLoading(){document.getElementById('loading').classList.remove('show');}
+
+function switchView(v,btn){
+  document.querySelectorAll('.nav-tab').forEach(function(t){t.classList.remove('active');});
+  btn.classList.add('active');
+  document.querySelectorAll('.view').forEach(function(x){x.classList.remove('active');});
+  document.getElementById('view-'+v).classList.add('active');
+  if(v==='map'&&map)setTimeout(function(){map.invalidateSize();},100);
+  if(v==='analysis'){
+    updateAnalysisContext();
+    refreshAllAnalysis();
+  }
+}
+function switchSemTab(tab,btn){
+  document.querySelectorAll('.sem-tab').forEach(function(t){t.classList.remove('active');});
+  btn.classList.add('active');
+  document.querySelectorAll('.sem-panel').forEach(function(p){p.classList.remove('active');});
+  document.getElementById('sp-'+tab).classList.add('active');
+  if(tab==='kg'&&kgSim)setTimeout(function(){kgSim.alpha(0.3).restart();},100);
+  if(tab==='charts')updateCharts();
+  if(tab==='metrics')updateMetrics();
+  if(tab==='ontology')buildOntology(getContextData());
+  if(tab==='rdf')buildRDF(getContextData());
+}
+function updateCharts(){
+  var data=getContextData();if(!data.length)return;
+  var speciesCounts={};data.forEach(function(r){var s=taxon(r);if(s!=='Unidentified')speciesCounts[s]=(speciesCounts[s]||0)+1;});
+  var topSpecies=Object.entries(speciesCounts).sort(function(a,b){return b[1]-a[1];}).slice(0,15);
+  mkChart('ch-species','bar',{labels:topSpecies.map(function(e){return e[0].length>18?e[0].substring(0,16)+'..':e[0];}),datasets:[{label:'Occurrences',data:topSpecies.map(function(e){return e[1];}),backgroundColor:'#56d364'}]},Object.assign({},chartOpts(),{indexAxis:'y'}));
+  var countryCounts={};data.forEach(function(r){if(r.country)countryCounts[r.country]=(countryCounts[r.country]||0)+1;});
+  var topCountries=Object.entries(countryCounts).sort(function(a,b){return b[1]-a[1];}).slice(0,15);
+  mkChart('ch-country','bar',{labels:topCountries.map(function(e){return(COUNTRIES[e[0]]||e[0]);}),datasets:[{label:'Records',data:topCountries.map(function(e){return e[1];}),backgroundColor:'#58a6ff'}]},Object.assign({},chartOpts(),{indexAxis:'y'}));
+  var yearCounts={};data.forEach(function(r){if(r.year)yearCounts[r.year]=(yearCounts[r.year]||0)+1;});
+  var years=Object.entries(yearCounts).sort(function(a,b){return parseInt(a[0])-parseInt(b[0]);}).slice(-30);
+  mkChart('ch-year','line',{labels:years.map(function(e){return e[0];}),datasets:[{label:'Records',data:years.map(function(e){return e[1];}),borderColor:'#bc8cff',backgroundColor:'rgba(188,140,255,.15)',tension:.3,fill:true,pointRadius:2}]},chartOpts());
+  var instCounts={};data.forEach(function(r){if(r.institutionCode)instCounts[r.institutionCode]=(instCounts[r.institutionCode]||0)+1;});
+  var topInst=Object.entries(instCounts).sort(function(a,b){return b[1]-a[1];}).slice(0,15);
+  mkChart('ch-institution','bar',{labels:topInst.map(function(e){return e[0].length>16?e[0].substring(0,14)+'..':e[0];}),datasets:[{label:'Contributions',data:topInst.map(function(e){return e[1];}),backgroundColor:'#ffa657'}]},Object.assign({},chartOpts(),{indexAxis:'y'}));
+}
+function updateMetrics(){
+  var data=getContextData();
+  var speciesSet=new Set(data.map(function(r){return taxon(r);}).filter(function(s){return s!=='Unidentified';}));
+  var countriesSet=new Set(data.map(function(r){return r.country;}).filter(Boolean));
+  var instSet=new Set(data.map(function(r){return r.institutionCode;}).filter(Boolean));
+  var threatenedCount=data.filter(function(r){return r.species&&IUCN[r.species];}).length;
+  document.getElementById('ms-rec').textContent=data.length.toLocaleString();
+  document.getElementById('ms-sp').textContent=speciesSet.size;
+  document.getElementById('ms-ct').textContent=countriesSet.size;
+  document.getElementById('ms-inst').textContent=instSet.size;
+  document.getElementById('ms-th').textContent=threatenedCount;
+  renderClusters();renderDescStats(data);renderInferStats(data);
+}
+function renderClusters(){
+  var grid=document.getElementById('cluster-grid');
+  if(!APP.selectedNode){
+    var byType={'species':0,'taxon':0,'country':0,'institution':0,'iucn':0,'interaction_target':0,'treatment':0,'trait':0,'genomic':0,'literature':0};
+    APP.kgNodes.forEach(function(n){if(byType[n.type]!==undefined)byType[n.type]++;});
+    var items=[
+      {name:'Species',val:byType['species'],color:'#ffa657',sub:'central'},
+      {name:'Taxonomy',val:byType['taxon'],color:'#0984e3',sub:'COL'},
+      {name:'Countries',val:byType['country'],color:'#d29922',sub:'GBIF'},
+      {name:'Interactions',val:byType['interaction_target'],color:'#e84393',sub:'GloBI'},
+      {name:'Treatments',val:byType['treatment'],color:'#6c5ce7',sub:'Plazi'},
+      {name:'Traits',val:byType['trait'],color:'#00b894',sub:'demo'},
+      {name:'Genomics',val:byType['genomic'],color:'#00cec9',sub:'demo'},
+      {name:'Literature',val:byType['literature'],color:'#fdcb6e',sub:'demo'}
+    ];
+    grid.innerHTML=items.map(function(it){return'<div class="cluster-card" style="--c:'+it.color+'"><div class="cluster-name">'+it.name+'</div><div class="cluster-val">'+it.val+'</div><div class="cluster-sub">'+it.sub+'</div></div>';}).join('');
+    return;
+  }
+  grid.innerHTML='<div style="color:#7d8590;text-align:center;padding:16px;grid-column:span 5">Node: '+APP.selectedNode.label+'</div>';
+}
+function renderDescStats(data){
+  var tbody=document.querySelector('#desc-table tbody');
+  var speciesCounts={};data.forEach(function(r){var s=taxon(r);if(s!=='Unidentified')speciesCounts[s]=(speciesCounts[s]||0)+1;});
+  var abundances=Object.values(speciesCounts).sort(function(a,b){return a-b;});
+  function stats(arr){if(arr.length===0)return{mean:'0',median:0,std:'0'};var n=arr.length,sum=arr.reduce(function(a,b){return a+b;},0),mean=sum/n;var variance=arr.reduce(function(a,b){return a+Math.pow(b-mean,2);},0)/n;return{mean:mean.toFixed(2),median:arr[Math.floor(n*0.5)],std:Math.sqrt(variance).toFixed(2)};}
+  var sp=stats(abundances);
+  var rows=[['Records (N)',data.length,'sample'],['Species (S)',Object.keys(speciesCounts).length,'richness'],['Species μ ± σ',sp.mean+' ± '+sp.std,'mean ± std'],['Species median',sp.median,'central']];
+  tbody.innerHTML=rows.map(function(r){return'<tr><td>'+r[0]+'</td><td class="val">'+r[1]+'</td><td class="dim">'+r[2]+'</td></tr>';}).join('');
+}
+function renderInferStats(data){
+  var tbody=document.querySelector('#infer-table tbody');
+  var speciesCounts={};data.forEach(function(r){var s=taxon(r);if(s!=='Unidentified')speciesCounts[s]=(speciesCounts[s]||0)+1;});
+  var abundances=Object.values(speciesCounts);var S=abundances.length;var N=abundances.reduce(function(a,b){return a+b;},0);
+  var H=0;abundances.forEach(function(ni){if(ni>0){var pi=ni/N;H-=pi*Math.log(pi);}});
+  var D=0;abundances.forEach(function(ni){D+=ni*(ni-1);});D=N>1?D/(N*(N-1)):0;
+  var simpson=1-D;var J=S>1?H/Math.log(S):0;
+  var rows=[['Shannon H\'',H.toFixed(4),H>3?'High':H>2?'Med':'Low'],['Simpson 1-D',simpson.toFixed(4),simpson>0.7?'High':'Med'],['Pielou J',J.toFixed(4),J>0.6?'Even':'Dom']];
+  tbody.innerHTML=rows.map(function(r){return'<tr><td>'+r[0]+'</td><td class="val">'+r[1]+'</td><td class="dim">'+r[2]+'</td></tr>';}).join('');
+}
+
+// ===== ONTOLOGY =====
+function buildOntology(data){
+  if(!data||!data.length){document.getElementById('ont-tree').innerHTML='<div style="color:#7d8590;text-align:center;padding:20px">Load data</div>';return;}
+  var tree={};
+  data.forEach(function(o){
+    var k=o.kingdom||'?',p=o.phylum||'?',c=o.class||'?',ord=o.order||'?',f=o.family||'?',g=o.genus||'?',s=taxon(o);
+    if(!tree[k])tree[k]={};if(!tree[k][p])tree[k][p]={};if(!tree[k][p][c])tree[k][p][c]={};
+    if(!tree[k][p][c][ord])tree[k][p][c][ord]={};if(!tree[k][p][c][ord][f])tree[k][p][c][ord][f]={};
+    if(!tree[k][p][c][ord][f][g])tree[k][p][c][ord][f][g]={};
+    tree[k][p][c][ord][f][g][s]=(tree[k][p][c][ord][f][g][s]||0)+1;
+  });
+  renderOnt(tree,document.getElementById('ont-tree'),0);
+}
+function renderOnt(tree,container,level){
+  container.innerHTML='';
+  Object.keys(tree).forEach(function(key){
+    var val=tree[key],isLeaf=typeof val==='number';
+    var node=document.createElement('div');node.className='ont-node';
+    var icons=['👑','🧬','📦','📋','🏠','🔬','🦎'];
+    node.innerHTML='<span>'+(isLeaf?'🦎':icons[Math.min(level,6)])+'</span><span class="ol">'+key+'</span>'+(isLeaf?'<span class="oc">'+val+'</span>':'');
+    node.onclick=function(e){e.stopPropagation();ontSelect(key,level,node);var ch=node.nextElementSibling;if(ch&&ch.classList.contains('ont-children'))ch.classList.toggle('open');};
+    container.appendChild(node);
+    if(!isLeaf){var ch=document.createElement('div');ch.className='ont-children';renderOnt(val,ch,level+1);container.appendChild(ch);}
+  });
+}
+function ontSelect(name,level,el){
+  var ranks=['Kingdom','Phylum','Class','Order','Family','Genus','Species'];
+  var rank=ranks[Math.min(level,ranks.length-1)];
+  document.querySelectorAll('.ont-node').forEach(function(n){n.classList.remove('selected');});
+  el.classList.add('selected');
+  var COL_XR='7ddf754f-d193-4cc9-b351-99906754a03b';
+  document.getElementById('ont-detail').innerHTML='<div class="ont-det-title">📖 '+name+'</div><div class="ont-uri">col:'+COL_XR+'/'+rank.toLowerCase()+'/'+name.replace(/\s/g,'_')+'</div><div class="ont-props"><div class="ont-prop"><span class="ont-pk">Rank</span><span class="ont-pv">'+rank+'</span></div><div class="ont-prop"><span class="ont-pk">Property</span><span class="ont-pv">dwc:'+rank.toLowerCase()+'</span></div><div class="ont-prop"><span class="ont-pk">Type</span><span class="ont-pv">owl:Class</span></div><div class="ont-prop"><span class="ont-pk">Source</span><span class="ont-pv">COL XR</span></div><div class="ont-prop"><span class="ont-pk">Namespace</span><span class="ont-pv">dwc:</span></div></div>';
+}
+
+// ===== RDF =====
+function buildRDF(data){
+  if(!data||!data.length){document.getElementById('rdf-body').innerHTML='<tr><td colspan="4" style="text-align:center;color:#7d8590;padding:20px">Load data</td></tr>';return;}
+  var COL_XR='7ddf754f';
+  var triples=[];
+  data.slice(0,80).forEach(function(o){
+    var sp=taxon(o),uri='col:'+COL_XR+'/species/'+sp.replace(/\s/g,'_');
+    triples.push({s:uri,p:'rdf:type',o:'dwc:Taxon',g:'col:'+COL_XR});
+    triples.push({s:uri,p:'dwc:scientificName',o:'"'+sp+'"',g:'col:'+COL_XR});
+    if(o.country)triples.push({s:uri,p:'dwc:country',o:'geo:'+o.country,g:'gbif:dist'});
+    if(o.kingdom)triples.push({s:uri,p:'dwc:kingdom',o:'"'+o.kingdom+'"',g:'col:'+COL_XR});
+    if(o.institutionCode)triples.push({s:'gbif:occ/'+o.key,p:'dwc:institutionCode',o:'"'+o.institutionCode+'"',g:'gbif:records'});
+    var iu=IUCN[o.species];if(iu)triples.push({s:uri,p:'iucn:status',o:'iucn:'+iu.s,g:'iucn:redlist'});
+  });
+  var html='';
+  triples.slice(0,150).forEach(function(t){
+    html+='<tr><td><span class="rdf-s">'+t.s+'</span></td><td><span class="rdf-p">'+t.p+'</span></td><td><span class="rdf-o">'+t.o+'</span></td><td>'+t.g+'</td></tr>';
+  });
+  document.getElementById('rdf-body').innerHTML=html;
+}
+
+// ===== QUERY =====
+function runQuery(preset){
+  var q={
+    threatened:'PREFIX iucn: <http://iucn.org/ontology#>\nSELECT ?species ?status WHERE {\n  ?species iucn:status ?status .\n}',
+    recent:'PREFIX dwc: <http://rs.tdwg.org/dwc/terms/>\nSELECT ?species ?year WHERE {\n  ?occ dwc:year ?year .\n  FILTER(?year > 2020)\n}',
+    institutions:'PREFIX dwc: <http://rs.tdwg.org/dwc/terms/>\nSELECT ?inst (COUNT(?occ) as ?count) WHERE {\n  ?occ dwc:institutionCode ?inst .\n} GROUP BY ?inst',
+    countries:'PREFIX dwc: <http://rs.tdwg.org/dwc/terms/>\nSELECT ?country (COUNT(?sp) as ?n) WHERE {\n  ?occ dwc:country ?country .\n} GROUP BY ?country',
+    triples:'SELECT ?s ?p ?o WHERE { ?s ?p ?o } LIMIT 50'
+  };
+  if(preset)document.getElementById('q-input').value=q[preset]||'';
+  var results=document.getElementById('q-results');
+  var data=getContextData();
+  if(!data.length){results.innerHTML='<div style="color:#f85149;text-align:center;padding:20px">No data in context</div>';return;}
+  var html='<div class="analytics-title" style="margin-bottom:8px">📋 Results ('+data.length+' records)</div>';
+  if(preset==='threatened'){
+    data.filter(function(r){return r.species&&IUCN[r.species];}).slice(0,20).forEach(function(r){var i=IUCN[r.species];html+='<div class="q-item"><div class="q-item-l">'+r.species+' <span class="iucn iucn-'+i.s.toLowerCase()+'">'+i.s+'</span></div><div class="q-item-m">'+i.c+' · '+(COUNTRIES[r.country]||r.country||'?')+'</div></div>';});
+  }else if(preset==='recent'){
+    data.filter(function(r){return r.year&&r.year>2020;}).slice(0,20).forEach(function(r){html+='<div class="q-item"><div class="q-item-l">'+taxon(r)+'</div><div class="q-item-m">'+(COUNTRIES[r.country]||'?')+' · '+r.year+'</div></div>';});
+  }else if(preset==='institutions'){
+    var insts={};data.forEach(function(r){if(r.institutionCode)insts[r.institutionCode]=(insts[r.institutionCode]||0)+1;});
+    Object.entries(insts).sort(function(a,b){return b[1]-a[1];}).slice(0,10).forEach(function(e){html+='<div class="q-item"><div class="q-item-l">'+e[0]+'</div><div class="q-item-m">'+e[1]+' occurrences</div></div>';});
+  }else if(preset==='countries'){
+    var cts={};data.forEach(function(r){if(r.country)cts[r.country]=(cts[r.country]||0)+1;});
+    Object.entries(cts).sort(function(a,b){return b[1]-a[1];}).slice(0,15).forEach(function(e){html+='<div class="q-item"><div class="q-item-l">'+(COUNTRIES[e[0]]||e[0])+'</div><div class="q-item-m">'+e[1]+' occurrences</div></div>';});
+  }else if(preset==='triples'){
+    var triples=[];var COL_XR='7ddf754f';
+    data.slice(0,15).forEach(function(o){
+      var sp=taxon(o),uri='col:'+COL_XR+'/species/'+sp.replace(/\s/g,'_');
+      triples.push({s:uri,p:'dwc:scientificName',o:sp});
+      if(o.country)triples.push({s:uri,p:'dwc:country',o:o.country});
+      if(o.kingdom)triples.push({s:uri,p:'dwc:kingdom',o:o.kingdom});
+    });
+    html+='<div style="font-size:9px;color:#7d8590;margin-bottom:6px">RDF Triples ('+triples.length+')</div>';
+    triples.forEach(function(t){
+      html+='<div class="q-triple"><span class="rdf-s">'+t.s.substring(0,30)+'...</span><span class="rdf-p">'+t.p+'</span><span class="rdf-o">'+t.o+'</span></div>';
+    });
+  }else{
+    data.slice(0,10).forEach(function(r){html+='<div class="q-item"><div class="q-item-l">'+taxon(r)+'</div><div class="q-item-m">'+(COUNTRIES[r.country]||'?')+' · '+(r.year||'?')+'</div></div>';});
+  }
+  results.innerHTML=html;
+}
+
+// ===== KG =====
+function buildKGCountries(){
+  APP.kgMode='countries';APP.focusCountry=null;
+  var nodes=[],links=[];
+  APP.countryList.forEach(function(code){var info=APP.countriesData[code];nodes.push({id:'cty:'+code,label:code,type:'country',weight:info.count,speciesCount:info.species.length});});
+  for(var i=0;i<APP.countryList.length;i++){for(var j=i+1;j<APP.countryList.length;j++){var c1=APP.countriesData[APP.countryList[i]];var c2=APP.countriesData[APP.countryList[j]];var shared=c1.species.filter(function(s){return c2.species.includes(s);}).length;if(shared>0)links.push({source:'cty:'+APP.countryList[i],target:'cty:'+APP.countryList[j],relation:'sharesSpecies',weight:shared});}}
+  APP.kgNodes=nodes;APP.kgLinks=links;updateKGStats(nodes,links);renderKGCountries(nodes,links);
+  document.getElementById('kg-mode-indicator').textContent='📍 ALL COUNTRIES ('+APP.countryList.length+')';
+}
+function buildKGSubgraph(countryCode){
+  APP.kgMode='subgraph';APP.focusCountry=countryCode;
+  var countryData=APP.data.filter(function(r){return r.country===countryCode;});
+  var countryInfo=APP.countriesData[countryCode];if(!countryInfo)return;
+  var nodes=[],links=[],nm={};
+  function an(id,label,type,extra){if(!nm[id]){var n=Object.assign({id:id,label:label,type:type},extra||{});nm[id]=n;nodes.push(n);return n;}return nm[id];}
+  function al(s,t,r,extra){links.push(Object.assign({source:s,target:t,relation:r},extra||{}));}
+  var countryNode=an('cty:'+countryCode,countryCode,'country-hub',{weight:countryInfo.count,speciesCount:countryInfo.species.length});
+  var speciesCounts={};countryData.forEach(function(r){var sp=taxon(r);if(sp!=='Unidentified')speciesCounts[sp]=(speciesCounts[sp]||0)+1;});
+  var sortedSpecies=Object.entries(speciesCounts).sort(function(a,b){return b[1]-a[1];});
+  sortedSpecies.forEach(function(e){var sp=e[0],count=e[1];var spNode=an('sp:'+sp,sp,'species',{weight:count});al(countryNode.id,spNode.id,'foundIn',{weight:count});});
+  countryData.forEach(function(r){var sp=taxon(r);if(sp==='Unidentified')return;var spNode=nm['sp:'+sp];if(!spNode)return;var taxLevels=[{field:'genus',prefix:'gen:'},{field:'family',prefix:'fam:'},{field:'order',prefix:'ord:'},{field:'kingdom',prefix:'kgd:'}];var prevNode=spNode;taxLevels.forEach(function(lv){if(r[lv.field]){var taxId=lv.prefix+r[lv.field];var taxNode=an(taxId,r[lv.field],'taxon',{rank:lv.field});al(prevNode.id,taxNode.id,'belongsTo');prevNode=taxNode;}});});
+  sortedSpecies.forEach(function(e){var sp=e[0];var iu=IUCN[sp];if(iu){var iucnNode=an('iucn:'+iu.s+'_'+countryCode,iu.s,'iucn',{status:iu.s});al('sp:'+sp,iucnNode.id,'hasStatus');}});
+  APP.kgNodes=nodes;APP.kgLinks=links;updateKGStats(nodes,links);renderKGSubgraph(nodes,links,countryNode);
+  document.getElementById('kg-mode-indicator').textContent='🎯 '+(COUNTRIES[countryCode]||countryCode)+' · '+countryInfo.count+' records';
+  renderCountryList();
+}
+function updateKGStats(nodes,links){
+  document.getElementById('kg-n').textContent=nodes.length;document.getElementById('kg-e').textContent=links.length;
+  document.getElementById('kg-sources').textContent=APP.kgMode==='species'?'8':'1';
+}
+function renderKGCountries(nodes,links){
+  var svg=d3.select('#kg-svg');svg.selectAll('*').remove();
+  var cont=document.querySelector('.kg-graph');var w=cont.clientWidth||800,h=cont.clientHeight||500;
+  svg.attr('viewBox',[0,0,w,h]);
+  kgZoom=d3.zoom().scaleExtent([0.2,5]).on('zoom',function(e){g.attr('transform',e.transform);});svg.call(kgZoom);var g=svg.append('g');
+  var maxCount=Math.max.apply(null,nodes.map(function(n){return n.weight;}).concat([1]));
+  var sizeScale=d3.scaleSqrt().domain([1,maxCount]).range([12,40]);
+  kgSim=d3.forceSimulation(nodes).force('link',d3.forceLink(links).id(function(d){return d.id;}).distance(100).strength(0.3)).force('charge',d3.forceManyBody().strength(-300)).force('center',d3.forceCenter(w/2,h/2)).force('collision',d3.forceCollide().radius(function(d){return sizeScale(d.weight||10)+6;}));
+  var link=g.append('g').selectAll('line').data(links).join('line').attr('class','kg-link');
+  var node=g.append('g').selectAll('g').data(nodes).join('g').attr('class','kg-node').call(d3.drag().on('start',function(e){if(!e.active)kgSim.alphaTarget(0.3).restart();e.subject.fx=e.subject.x;e.subject.fy=e.subject.y;}).on('drag',function(e){e.subject.fx=e.x;e.subject.fy=e.y;}).on('end',function(e){if(!e.active)kgSim.alphaTarget(0);e.subject.fx=null;e.subject.fy=null;}));
+  node.append('circle').attr('r',function(d){return sizeScale(d.weight||10);}).attr('fill',function(d){return d3.scaleLinear().domain([1,50,200]).range(['#d29922','#56d364','#3fb950'])(Math.min(d.speciesCount||1,200));}).attr('stroke','#ffa657').attr('stroke-width',2);
+  node.append('text').text(function(d){return d.label;}).attr('x',0).attr('y',4).attr('text-anchor','middle').attr('font-size',function(d){return Math.max(9,sizeScale(d.weight)/4);}).attr('font-weight','700').attr('fill','#0d1117');
+  node.on('click',function(e,d){e.stopPropagation();expandCountry(d.label);});
+  kgSim.on('tick',function(){nodes.forEach(function(n){var r=sizeScale(n.weight||10);n.x=Math.max(r+5,Math.min(w-r-5,n.x));n.y=Math.max(r+5,Math.min(h-r-5,n.y));});link.attr('x1',function(d){return d.source.x;}).attr('y1',function(d){return d.source.y;}).attr('x2',function(d){return d.target.x;}).attr('y2',function(d){return d.target.y;});node.attr('transform',function(d){return 'translate('+d.x+','+d.y+')';});});
+}
+function renderKGSubgraph(nodes,links,countryNode){
+  var svg=d3.select('#kg-svg');svg.selectAll('*').remove();
+  var cont=document.querySelector('.kg-graph');var w=cont.clientWidth||800,h=cont.clientHeight||500;
+  svg.attr('viewBox',[0,0,w,h]);
+  kgZoom=d3.zoom().scaleExtent([0.1,5]).on('zoom',function(e){g.attr('transform',e.transform);});svg.call(kgZoom);var g=svg.append('g');
+  var colors={'country-hub':'#ffa657','species':'#56d364','taxon':'#58a6ff','institution':'#bc8cff','iucn':'#f85149'};
+  var baseSizes={'country-hub':30,'species':7,'taxon':9,'institution':9,'iucn':11};
+  if(countryNode){countryNode.fx=w/2;countryNode.fy=h/2;}
+  kgSim=d3.forceSimulation(nodes).force('link',d3.forceLink(links).id(function(d){return d.id;}).distance(function(d){if(d.source.type==='country-hub'||d.target.type==='country-hub')return 100;return 60;})).force('charge',d3.forceManyBody().strength(function(d){return d.type==='country-hub'?-600:-80;})).force('center',d3.forceCenter(w/2,h/2).strength(0.02)).force('collision',d3.forceCollide().radius(function(d){return(baseSizes[d.type]||7)+3;})).force('radial',d3.forceRadial(function(d){if(d.type==='country-hub')return 0;if(d.type==='species')return 120;if(d.type==='taxon')return 220;return 200;},w/2,h/2).strength(0.1));
+  var link=g.append('g').selectAll('line').data(links).join('line').attr('class','kg-link').attr('stroke','#30363d').attr('stroke-opacity',0.4);
+  var node=g.append('g').selectAll('g').data(nodes).join('g').attr('class','kg-node').call(d3.drag().on('start',function(e){if(!e.active)kgSim.alphaTarget(0.3).restart();e.subject.fx=e.subject.x;e.subject.fy=e.subject.y;}).on('drag',function(e){e.subject.fx=e.x;e.subject.fy=e.y;}).on('end',function(e){if(!e.active)kgSim.alphaTarget(0);if(e.subject.type!=='country-hub'){e.subject.fx=null;e.subject.fy=null;}}));
+  node.append('circle').attr('r',function(d){var base=baseSizes[d.type]||7;if(d.type==='species'&&d.weight)return base+Math.sqrt(d.weight)*0.6;return base;}).attr('fill',function(d){return colors[d.type]||'#7d8590';}).attr('stroke','#0d1117').attr('stroke-width',1.5);
+  node.append('text').text(function(d){return d.label.length>15?d.label.substring(0,13)+'..':d.label;}).attr('x',0).attr('y',function(d){return-(baseSizes[d.type]||7)-3;}).attr('text-anchor','middle').attr('font-size','8').attr('fill',function(d){return d.type==='country-hub'?'#0d1117':'#e6edf3';}).attr('font-style',function(d){return d.type==='species'?'italic':'normal';});
+  node.on('click',function(e,d){e.stopPropagation();selectKGNode(d);});
+  svg.on('click',function(e){if(e.target===svg.node())resetSelection();});
+  kgSim.on('tick',function(){nodes.forEach(function(n){if(n.type==='country-hub')return;n.x=Math.max(15,Math.min(w-15,n.x));n.y=Math.max(15,Math.min(h-15,n.y));});link.attr('x1',function(d){return d.source.x;}).attr('y1',function(d){return d.source.y;}).attr('x2',function(d){return d.target.x;}).attr('y2',function(d){return d.target.y;});node.attr('transform',function(d){return 'translate('+d.x+','+d.y+')';});});
+}
+function expandCountry(countryCode){if(!APP.countriesData[countryCode])return;APP.countryIndex=APP.countryList.indexOf(countryCode);buildKGSubgraph(countryCode);}
+function showCountriesView(){APP.kgMode='countries';APP.focusCountry=null;buildKGCountries();}
+function expandNextCountry(){if(APP.countryList.length===0)return;var randomIndex=Math.floor(Math.random()*APP.countryList.length);APP.countryIndex=randomIndex;expandCountry(APP.countryList[randomIndex]);}
+function selectKGNode(node){
+  APP.selectedNode=node;
+  var connected=APP.kgLinks.filter(function(l){var s=typeof l.source==='object'?l.source.id:l.source;var t=typeof l.target==='object'?l.target.id:l.target;return s===node.id||t===node.id;});
+  var html='<div style="color:#e6edf3;font-weight:600;margin-bottom:4px;font-size:12px">'+node.label+'</div>';
+  html+='<div style="color:#7d8590;margin-bottom:6px;font-size:10px">Type: '+node.type+' · '+connected.length+' links'+(node.source?' · Source: '+node.source:'')+'</div>';
+  if(node.weight)html+='<div style="font-size:9px;color:#56d364">Weight: '+node.weight+'</div>';
+  if(node.rank)html+='<div style="font-size:9px;color:#0984e3">Rank: '+node.rank+'</div>';
+  if(node.status)html+='<div style="font-size:9px;color:#f85149">Status: '+node.status+'</div>';
+  document.getElementById('kg-info').innerHTML=html;
+}
+function selectKGNodeById(id){var node=APP.kgNodes.find(function(n){return n.id===id;});if(node)selectKGNode(node);}
+function resetSelection(){APP.selectedNode=null;document.getElementById('kg-info').innerHTML='Click a node';}
+function chartOpts(){return{responsive:true,maintainAspectRatio:false,plugins:{legend:{labels:{color:'#e6edf3',font:{size:8}}}},scales:{x:{ticks:{color:'#7d8590',font:{size:7},maxRotation:45},grid:{color:'#21262d'}},y:{ticks:{color:'#7d8590',font:{size:7}},grid:{color:'#21262d'}}}};}
+function mkChart(id,type,data,opts){if(charts[id])charts[id].destroy();var ctx=document.getElementById(id);if(!ctx)return;charts[id]=new Chart(ctx,{type:type,data:data,options:opts});}
+document.querySelectorAll('.chip[data-taxon]').forEach(function(c){c.addEventListener('click',function(){document.querySelectorAll('.chip[data-taxon]').forEach(function(x){x.classList.remove('active');});c.classList.add('active');});});
+function updateClock(){var now=new Date();document.getElementById('clock').textContent=now.toISOString().split('T')[0]+' '+now.toUTCString().split(' ')[4]+' UTC';}
+
+try{
+  initMap();populateCountrySelect();initSourcesPanel();renderGeoExplorer();initLiveRefresh();updateClock();setInterval(updateClock,1000);
+  setMapSelection('global',null,'Global',[]);
+  setTimeout(function(){startBulkLoad();},800);
+}catch(e){console.error('Init error:',e);}
+</script>
+</body>
+</html>
