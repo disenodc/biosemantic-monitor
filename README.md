@@ -1,4 +1,4 @@
-# 🧬 BioSemantic Monitor v4.1
+# 🧬 BioSemantic Monitor
 
 A single-file, browser-based dashboard for exploring biodiversity occurrence data on an interactive map and enriching it with semantic sources (taxonomy, species interactions, taxonomic literature). It combines live **GBIF** occurrence data with **Catalogue of Life (COL)**, **GloBI**, and **Plazi** enrichment, and presents the results as a map, a force-directed knowledge graph, charts, and metrics.
 
