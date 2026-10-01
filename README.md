@@ -1,5 +1,7 @@
 # 🧬 BioSemantic Monitor
 
+[WebSite](https://biosemantic-monitor.vercel.app/)
+
 El **BioSemantic Monitor v5.0** es un panel de control interactivo que se ejecuta directamente en el navegador web a partir de un único archivo, diseñado para explorar datos de ocurrencia de biodiversidad sobre un mapa interactivo y enriquecerlos con fuentes semánticas (taxonomía, interacciones de especies y literatura taxonómica). Combina datos en vivo de ocurrencias de **GBIF** con fuentes de enriquecimiento como **Catalogue of Life (COL)**, **GloBI** y **Plazi**, presentando los resultados mediante mapas, un grafo de conocimiento dirigido por fuerzas, gráficos y métricas.
 
 Todo funciona del lado del cliente en un solo archivo HTML, sin requerir procesos de compilación, backends ni claves de API.
